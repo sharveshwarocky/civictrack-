@@ -97,3 +97,13 @@ and use the **Admin** tab to approve/reject new organizations.
   uploads require a signed-in user).
 - Unit tests: `npm test` (vitest) covers the formatters, anonymous-username
   generator and area geolocation resolver.
+
+## Password-reset redirect URLs (Phase 3)
+
+The org "Forgot password?" flow uses `resetPasswordForEmail` with `redirectTo` `/reset-password`.
+Add these to **Supabase → Authentication → URL Configuration → Redirect URLs** or the email link breaks:
+
+- `http://localhost:5173` (dev)
+- `https://civictrack-sepia.vercel.app` (production)
+
+Also keep your **Site URL** set to the deployed origin so recovery links land correctly.

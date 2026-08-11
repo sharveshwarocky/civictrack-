@@ -91,7 +91,10 @@ export default function DeptIssues() {
     const timeline = d.timeline.map((s) =>
       s.label === label ? { ...s, done: !s.done, date: !s.done ? 'Today' : '—' } : s,
     )
-    patch(id, { timeline, timelineTouched: true })
+    const step = timeline.find((s) => s.label === label)
+    // Keep the timeline and status consistent: turning on 'Completed' completes the issue.
+    const extra = label === 'Completed' && step?.done ? { status: 'completed' as const } : {}
+    patch(id, { timeline, timelineTouched: true, ...extra })
   }
 
   const pickAfter = (f: File | undefined) => {

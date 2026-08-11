@@ -112,6 +112,7 @@ export default function GovLogin() {
               onChange={(m) => {
                 setStage(m === 'signup' ? 'register' : 'login')
                 setError('')
+                setForgotSent(false)
               }}
             />
           </div>

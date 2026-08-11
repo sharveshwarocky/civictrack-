@@ -24,7 +24,10 @@ export default function ResetPassword() {
       return
     }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setStatus('ready')
+      if (event === 'PASSWORD_RECOVERY') {
+        clearTimeout(t)
+        setStatus('ready')
+      }
     })
     // If no recovery event arrives, the link is missing/expired.
     const t = setTimeout(() => setStatus((s) => (s === 'ready' ? s : 'none')), 3000)
