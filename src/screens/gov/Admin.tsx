@@ -99,29 +99,19 @@ export default function Admin() {
 
       <div className="rounded-xl border border-line bg-surface p-3.5 text-[11.5px] leading-relaxed text-muted">
         <p className="font-semibold text-ink">💡 First-time setup: create the admin account</p>
-        <p className="mt-2">Run these <strong>two steps</strong> in the Supabase SQL editor:</p>
+        <p className="mt-2">Do these <strong>two steps</strong> in the Supabase dashboard:</p>
         <p className="mt-2"><strong>Step 1 — Create the auth user (with a password):</strong></p>
-        <code className="mt-1 block rounded-lg bg-ink/[0.04] p-2.5 font-mono text-[10px] leading-relaxed text-blue">
-          select net.http_post(
-          <br />&nbsp;&nbsp;url := (select url || '/auth/v1/admin/users' from supabase_functions.settings),
-          <br />&nbsp;&nbsp;headers := jsonb_build_object(
-          <br />&nbsp;&nbsp;&nbsp;&nbsp;'apikey', (select key from supabase_functions.settings),
-          <br />&nbsp;&nbsp;&nbsp;&nbsp;'Authorization', 'Bearer ' || (select key from supabase_functions.settings)
-          <br />&nbsp;&nbsp;),
-          <br />&nbsp;&nbsp;body := jsonb_build_object(
-          <br />&nbsp;&nbsp;&nbsp;&nbsp;'email', 'admin@civictrack.gov',
-          <br />&nbsp;&nbsp;&nbsp;&nbsp;'password', 'admin123456',
-          <br />&nbsp;&nbsp;&nbsp;&nbsp;'email_confirm', true,
-          <br />&nbsp;&nbsp;&nbsp;&nbsp;'user_metadata', jsonb_build_object('role', 'org')
-          <br />&nbsp;&nbsp;)
-          <br />);
-        </code>
+        <p className="mt-2">
+          <strong>Authentication → Users → Add user</strong>, enter <code className="text-blue">admin@civictrack.gov</code> + a strong password, and
+          confirm the email. (The old SQL snippet used <code className="text-blue">supabase_functions.settings</code>, which doesn't exist on this
+          project — use the dashboard instead.)
+        </p>
         <p className="mt-2"><strong>Step 2 — Create the org row:</strong></p>
         <code className="mt-1 block rounded-lg bg-ink/[0.04] p-2.5 font-mono text-[10px] leading-relaxed text-blue">
           insert into organizations (email, org_name, department, role, status)
           <br />values ('admin@civictrack.gov', 'CivicTrack Admin', 'admin', 'admin', 'approved');
         </code>
-        <p className="mt-2">Then sign in at <strong>/gov</strong> with <code className="text-blue">admin@civictrack.gov</code> / <code className="text-blue">admin123456</code>.</p>
+        <p className="mt-2">Then sign in at <strong>/gov</strong> with <code className="text-blue">admin@civictrack.gov</code> / the password you set.</p>
       </div>
     </div>
   )
