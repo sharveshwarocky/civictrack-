@@ -20,6 +20,7 @@ const Search = lazy(() => import('./screens/Search'))
 const Settings = lazy(() => import('./screens/Settings'))
 const Updates = lazy(() => import('./screens/Updates'))
 
+const ResetPassword = lazy(() => import('./screens/ResetPassword'))
 const OrgLogin = lazy(() => import('./screens/gov/GovLogin'))
 const OrgLayout = lazy(() => import('./screens/gov/GovLayout'))
 const OrgOverview = lazy(() => import('./screens/gov/Overview'))
@@ -128,6 +129,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Splash />} />
           <Route path="/login" element={<AuthColumn><Login /></AuthColumn>} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<AuthColumn><RequireOnboarding /></AuthColumn>}>
             <Route index element={<Onboarding />} />
           </Route>

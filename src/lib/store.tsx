@@ -23,6 +23,7 @@ import type {
   Profile,
   Reactions,
   Status,
+  TimelineStep,
 } from './types'
 
 export type ThemePref = 'dark' | 'light' | 'system'
@@ -56,6 +57,8 @@ export interface OfficialUpdateInput {
   spent?: number
   status?: Status
   afterPhoto?: string // data URL or public URL
+  contractor?: string
+  timeline?: TimelineStep[]
   orgName: string
 }
 
@@ -82,6 +85,9 @@ interface AppState {
   loginWithGoogle: () => Promise<void>
   authError: string | null
   clearAuthError: () => void
+  // org password reset
+  sendPasswordReset: (email: string) => Promise<string | null>
+  updatePassword: (password: string) => Promise<string | null>
   // interactions
   upvoted: Record<string, boolean>
   toggleUpvote: (id: string) => void
@@ -576,6 +582,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const clearAuthError = useCallback(() => setAuthError(null), [])
 
+  const sendPasswordReset = useCallback(async (email: string): Promise<string | null> => {
+    if (!supabase) return 'Password reset requires Supabase to be configured'
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password',
+    })
+    return error?.message ?? null
+  }, [])
+
+  const updatePassword = useCallback(async (password: string): Promise<string | null> => {
+    if (!supabase) return 'Password reset requires Supabase to be configured'
+    const { error } = await supabase.auth.updateUser({ password })
+    return error?.message ?? null
+  }, [])
+
   // ---- onboarding ----
   const saveProfile = useCallback(
     async (data: { username: string; homeArea: string; lat?: number; lng?: number }) => {
@@ -980,11 +1000,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         notifTitle = 'Progress updated'
         notifIcon = '📈'
       }
-      const completedTimeline = isComplete
-        ? (issue.timeline ?? DEFAULT_TIMELINE).map((s) =>
-            s.label === 'Completed' ? { ...s, date: 'Done', done: true } : s,
-          )
-        : undefined
+      // Always computed (non-undefined) so it type-checks; only sent when completing.
+      const completedTimeline = (issue.timeline ?? DEFAULT_TIMELINE).map((s) =>
+        s.label === 'Completed' ? { ...s, date: 'Done', done: true } : s,
+      )
       const { error } = await supabase.rpc('post_official_update', {
         p_issue_id: issueId,
         p_official: official,
@@ -993,33 +1012,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...(data.spent !== undefined ? { p_spent: data.spent } : {}),
         ...(data.progress !== undefined ? { p_completionpct: data.progress } : {}),
         ...(afterCover ? { p_aftercover: afterCover } : {}),
+        ...(data.contractor ? { p_contractor: data.contractor } : {}),
         p_clear_expected: isComplete,
-        ...(isComplete ? { p_completed_at: new Date().toISOString(), p_timeline: completedTimeline } : {}),
+        ...(isComplete
+          ? { p_completed_at: new Date().toISOString(), p_timeline: completedTimeline }
+          : data.timeline
+            ? { p_timeline: data.timeline }
+            : {}),
       })
       if (error) return friendlyDbError(error.message)
       // Optimistically reflect the change locally so the org sees it instantly,
       // even if realtime hiccups — the UPDATE event replaces it idempotently.
       setIssues((prev) =>
         prev.map((i) =>
-          i.id === issueId
-            ? {
-                ...i,
-                official,
-                ...(data.status ? { status: data.status } : {}),
-                ...(data.budget !== undefined ? { budget: data.budget } : {}),
-                ...(data.spent !== undefined ? { spent: data.spent } : {}),
-                ...(data.progress !== undefined ? { completionPct: data.progress } : {}),
-                ...(afterCover ? { afterCover } : {}),
-                ...(isComplete
-                  ? {
-                      completedAt: new Date().toISOString(),
-                      expected: undefined,
-                      completionPct: 100,
-                      timeline: completedTimeline,
-                    }
-                  : {}),
-              }
-            : i,
+          i.id === issueId              ? {
+                  ...i,
+                  official,
+                  ...(data.status ? { status: data.status } : {}),
+                  ...(data.budget !== undefined ? { budget: data.budget } : {}),
+                  ...(data.spent !== undefined ? { spent: data.spent } : {}),
+                  ...(data.progress !== undefined ? { completionPct: data.progress } : {}),
+                  ...(afterCover ? { afterCover } : {}),
+                  ...(data.contractor ? { contractor: data.contractor } : {}),
+                  ...(isComplete
+                    ? {
+                        completedAt: new Date().toISOString(),
+                        expected: undefined,
+                        completionPct: 100,
+                        timeline: completedTimeline,
+                      }
+                    : data.timeline
+                      ? { timeline: data.timeline }
+                      : {}),
+                }
+              : i,
         ),
       )
       const body = `${data.orgName} · ${issue.title.slice(0, 60)}${issue.title.length > 60 ? '…' : ''}`
@@ -1053,10 +1079,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       needsOnboarding,
       saveProfile,
       sendEmailOtp,
-      verifyEmailOtp,
-      loginWithGoogle,
-      authError,
-      clearAuthError,
+      verifyEmailOtp, loginWithGoogle, authError, clearAuthError, sendPasswordReset, updatePassword,
       upvoted,
       toggleUpvote,
       following,
@@ -1084,7 +1107,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }),
     [
       issues, area, setArea, appError, clearAppError, sessionReady, profileResolved, loggedIn, user, login, logout, profile, needsOnboarding,
-      saveProfile, sendEmailOtp, verifyEmailOtp, loginWithGoogle, authError, clearAuthError,
+      saveProfile, sendEmailOtp, verifyEmailOtp, loginWithGoogle, authError, clearAuthError, sendPasswordReset, updatePassword,
       upvoted, toggleUpvote, following, toggleFollow, reactions, reactToOfficial, addIssue, ensureIssue,
       comments, addComment, notifications, unreadCount, markRead, markAllRead, org, loginOrg,
       registerOrg, logoutOrg, pendingOrgs, loadPendingOrgs, approveOrg, postOfficialUpdate,

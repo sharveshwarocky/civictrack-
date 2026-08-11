@@ -6,9 +6,15 @@ import { compact, formatINR, relativeTime, slaInfo } from '../../lib/format'
 import { CATEGORY_META } from '../../lib/constants'
 import { getDeptById } from '../../lib/departments'
 import { useApp } from '../../lib/store'
-import type { Issue, Status } from '../../lib/types'
+import type { Issue, Status, TimelineStep } from '../../lib/types'
 
 type Filter = 'all' | 'open' | 'overdue' | 'completed'
+
+const TIMELINE_LABELS = ['Reported', 'Inspected', 'Funded', 'In Progress', 'Completed']
+
+function defaultTimeline(): TimelineStep[] {
+  return TIMELINE_LABELS.map((label, i) => ({ label, date: i === 0 ? 'Today' : '—', done: i === 0 }))
+}
 
 interface Draft {
   text: string
@@ -18,11 +24,27 @@ interface Draft {
   spent: string
   status: Status | ''
   afterPhoto: string | null
+  contractor: string
+  timeline: TimelineStep[]
+  timelineTouched: boolean
   busy: boolean
   error: string
 }
 
-const EMPTY: Draft = { text: '', progress: 0, progressTouched: false, budget: '', spent: '', status: '', afterPhoto: null, busy: false, error: '' }
+const EMPTY: Draft = {
+  text: '',
+  progress: 0,
+  progressTouched: false,
+  budget: '',
+  spent: '',
+  status: '',
+  afterPhoto: null,
+  contractor: '',
+  timeline: defaultTimeline(),
+  timelineTouched: false,
+  busy: false,
+  error: '',
+}
 
 export default function DeptIssues() {
   const { issues, org, postOfficialUpdate } = useApp()
@@ -47,13 +69,29 @@ export default function DeptIssues() {
   const patch = (id: string, p: Partial<Draft>) =>
     setDrafts((prev) => ({ ...prev, [id]: { ...(prev[id] ?? EMPTY), ...p } }))
 
-  const toggleOpen = (id: string, completionPct?: number) => {
+  const toggleOpen = (id: string, completionPct?: number, issue?: Issue) => {
     if (openId === id) {
       setOpenId(null)
       return
     }
-    setDrafts((prev) => ({ ...prev, [id]: prev[id] ?? { ...EMPTY, progress: completionPct ?? 0 } }))
+    setDrafts((prev) => ({
+      ...prev,
+      [id]: prev[id] ?? {
+        ...EMPTY,
+        progress: completionPct ?? 0,
+        contractor: issue?.contractor ?? '',
+        timeline: issue?.timeline?.length ? issue.timeline : defaultTimeline(),
+      },
+    }))
     setOpenId(id)
+  }
+
+  const toggleStep = (id: string, label: string) => {
+    const d = drafts[id] ?? EMPTY
+    const timeline = d.timeline.map((s) =>
+      s.label === label ? { ...s, done: !s.done, date: !s.done ? 'Today' : '—' } : s,
+    )
+    patch(id, { timeline, timelineTouched: true })
   }
 
   const pickAfter = (f: File | undefined) => {
@@ -74,6 +112,8 @@ export default function DeptIssues() {
       ...(d.spent !== '' ? { spent: Number(d.spent) } : {}),
       ...(d.status ? { status: d.status } : {}),
       ...(d.afterPhoto ? { afterPhoto: d.afterPhoto } : {}),
+      ...(d.contractor.trim() && d.contractor.trim() !== (issue.contractor ?? '') ? { contractor: d.contractor.trim() } : {}),
+      ...(d.timelineTouched ? { timeline: d.timeline } : {}),
       orgName: org.org_name,
     })
     if (err) {
@@ -127,7 +167,7 @@ export default function DeptIssues() {
           const d = drafts[i.id] ?? EMPTY
           return (
             <div key={i.id} className="rounded-xl border border-line bg-surface p-3.5 transition-all">
-              <button onClick={() => toggleOpen(i.id, i.completionPct)} className="flex w-full items-start gap-2.5 text-left">
+              <button onClick={() => toggleOpen(i.id, i.completionPct, i)} className="flex w-full items-start gap-2.5 text-left">
                 <span className="mt-0.5 text-lg">{CATEGORY_META[i.category]?.emoji ?? '📍'}</span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -191,6 +231,17 @@ export default function DeptIssues() {
                     />
                   </div>
 
+                  {/* contractor */}
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-[0.1em] text-faint">Contractor (optional)</label>
+                    <input
+                      value={d.contractor}
+                      onChange={(e) => patch(i.id, { contractor: e.target.value })}
+                      placeholder={i.contractor ?? 'Contractor name — e.g. L&T'}
+                      className="mt-1 w-full rounded-lg border border-line bg-ink/[0.02] px-3 py-2 text-[12px] font-semibold text-ink outline-none placeholder:text-faint focus:border-blue/30"
+                    />
+                  </div>
+
                   {/* budget + spent */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
@@ -215,11 +266,11 @@ export default function DeptIssues() {
                     </div>
                   </div>
 
-                  {/* status */}
+                  {/* status — overdue is now automatic via SLA (Phase 2 cron), so no manual toggle */}
                   <div>
                     <label className="text-[9px] font-bold uppercase tracking-[0.1em] text-faint">Change status</label>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {(['under_review', 'in_progress', 'overdue', 'completed'] as Status[]).map((s) => (
+                      {(['under_review', 'in_progress', 'completed'] as Status[]).map((s) => (
                         <button
                           key={s}
                           onClick={() => patch(i.id, { status: d.status === s ? '' : s })}
@@ -227,7 +278,26 @@ export default function DeptIssues() {
                             d.status === s ? 'border-green/40 bg-green/10 text-green' : 'border-line bg-ink/[0.02] text-muted'
                           }`}
                         >
-                          {s === 'under_review' ? 'Under review' : s === 'in_progress' ? 'In progress' : s === 'overdue' ? 'Mark overdue' : 'Mark complete ✓'}
+                          {s === 'under_review' ? 'Under review' : s === 'in_progress' ? 'In progress' : 'Mark complete ✓'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* work timeline */}
+                  <div>
+                    <label className="text-[9px] font-bold uppercase tracking-[0.1em] text-faint">Work timeline</label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {d.timeline.map((s) => (
+                        <button
+                          key={s.label}
+                          onClick={() => toggleStep(i.id, s.label)}
+                          className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                            s.done ? 'border-green/40 bg-green/10 text-green' : 'border-line bg-ink/[0.02] text-muted'
+                          }`}
+                        >
+                          {s.done ? '✓ ' : ''}
+                          {s.label}
                         </button>
                       ))}
                     </div>

@@ -6,7 +6,7 @@ import { DEPARTMENTS } from '../../lib/departments'
 import { useApp } from '../../lib/store'
 
 export default function GovLogin() {
-  const { loginOrg, registerOrg } = useApp()
+  const { loginOrg, registerOrg, sendPasswordReset } = useApp()
   const navigate = useNavigate()
   const [stage, setStage] = useState<'login' | 'register' | 'pending'>('login')
   const [email, setEmail] = useState('')
@@ -16,6 +16,7 @@ export default function GovLogin() {
   const [contact, setContact] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [forgotSent, setForgotSent] = useState(false)
 
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
@@ -30,6 +31,22 @@ export default function GovLogin() {
       return
     }
     navigate('/gov/portal/overview')
+  }
+
+  const doForgot = async () => {
+    if (!validEmail) {
+      setError('Enter your registered work email first.')
+      return
+    }
+    setBusy(true)
+    setError('')
+    const err = await sendPasswordReset(email.trim())
+    setBusy(false)
+    if (err) {
+      setError(err)
+      return
+    }
+    setForgotSent(true)
   }
 
   const doRegister = async () => {
@@ -184,6 +201,24 @@ export default function GovLogin() {
                   className="w-full bg-transparent text-[15px] font-medium tracking-wide text-ink outline-none placeholder:text-faint"
                 />
               </div>
+
+              {stage === 'login' && (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={() => void doForgot()}
+                    disabled={busy}
+                    className="text-[11px] font-semibold text-blue transition-colors hover:text-blue/70 disabled:opacity-50"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
+
+              {forgotSent && stage === 'login' && (
+                <p className="mt-3 rounded-xl border border-green/25 bg-green/5 px-3 py-2.5 text-center text-[11px] font-medium text-green">
+                  Reset link sent — check {email.trim()} and follow the instructions.
+                </p>
+              )}
 
               {stage === 'register' && (
                 <>
