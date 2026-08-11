@@ -106,7 +106,17 @@ export default function Admin() {
           confirm the email. (The old SQL snippet used <code className="text-blue">supabase_functions.settings</code>, which doesn't exist on this
           project — use the dashboard instead.)
         </p>
-        <p className="mt-2"><strong>Step 2 — Create the org row:</strong></p>
+        <p className="mt-2"><strong>Step 2 — Tag the user as an organization:</strong></p>
+        <p className="mt-2">
+          The dashboard doesn't let you set user metadata, and the portal rejects accounts without <code className="text-blue">role: org</code> — run this
+          in the SQL editor:
+        </p>
+        <code className="mt-1 block rounded-lg bg-ink/[0.04] p-2.5 font-mono text-[10px] leading-relaxed text-blue">
+          update auth.users
+          <br />set raw_user_meta_data = jsonb_build_object('role', 'org')
+          <br />where email = 'admin@civictrack.gov';
+        </code>
+        <p className="mt-2"><strong>Step 3 — Create the org row:</strong></p>
         <code className="mt-1 block rounded-lg bg-ink/[0.04] p-2.5 font-mono text-[10px] leading-relaxed text-blue">
           insert into organizations (email, org_name, department, role, status)
           <br />values ('admin@civictrack.gov', 'CivicTrack Admin', 'admin', 'admin', 'approved');
