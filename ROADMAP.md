@@ -44,3 +44,9 @@
 
 ## Validation at the end of every phase
 `npx tsc -b --noEmit` → `npm run build` → `npx vitest run` → browser pass on affected flows.
+
+## Phase 5 — Organization onboarding (in progress)
+- [ ] Fix `post_official_update` overload (Phase 3 `create or replace` left a stale 10-param signature → PGRST203) — `upgrade-phase5.sql`
+- [ ] Verify org sign-up → admin approval → portal login end-to-end over HTTPS
+- [ ] Bootstrap first admin account (dashboard user + `role: org` metadata + approved row)
+- [ ] Confirm org work panel posts updates (with & without contractor)
