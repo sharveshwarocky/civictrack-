@@ -14,6 +14,7 @@ import { nextReaction } from './interactions'
 import { SLA_DAYS } from './constants'
 import { colorForUserId } from './username'
 import type {
+  AdminUser,
   AppNotification,
   CoverSpec,
   DbComment,
@@ -99,6 +100,12 @@ interface AppState {
   ensureIssue: (id: string) => Promise<void>
   comments: Record<string, DbComment[]>
   addComment: (issueId: string, text: string) => void
+  deleteComment: (issueId: string, commentId: string) => Promise<string | null>
+  deleteIssue: (issueId: string) => Promise<string | null>
+  // admin: citizen moderation
+  adminUsers: AdminUser[]
+  loadAdminUsers: (search?: string) => Promise<void>
+  removeUser: (userId: string) => Promise<string | null>
   // notifications
   notifications: AppNotification[]
   unreadCount: number
@@ -503,6 +510,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return { ...prev, [row.issue_id]: [...list, row] }
         })
       })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments' }, (payload) => {
+        // DELETE payloads only carry the primary key (replica identity), so
+        // locate the comment by id across all issue groups.
+        const id = (payload.old as { id?: string })?.id
+        if (!id) return
+        setComments((prev) => {
+          const hit = Object.keys(prev).find((iid) => prev[iid].some((c) => c.id === id))
+          return hit ? { ...prev, [hit]: prev[hit].filter((c) => c.id !== id) } : prev
+        })
+      })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
         const row = payload.new as unknown as AppNotification
         if (!row?.id || !row?.title) return
@@ -810,6 +827,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return error ? friendlyDbError(error.message) : null
   }, [])
 
+  // ---- delete comment (author or admin) ----
+  const deleteComment = useCallback(async (issueId: string, commentId: string): Promise<string | null> => {
+    if (!supabase) return null // demo mode: local-only, nothing to delete
+    const { error } = await supabase.from('comments').delete().eq('id', commentId)
+    if (error) return friendlyDbError(error.message)
+    // Optimistic cleanup in case realtime is delayed.
+    setComments((prev) => ({
+      ...prev,
+      [issueId]: (prev[issueId] ?? []).filter((c) => c.id !== commentId),
+    }))
+    const current = issuesRef.current.find((i) => i.id === issueId)?.comments ?? 0
+    const next = Math.max(0, current - 1)
+    setIssues((prev) => prev.map((i) => (i.id === issueId ? { ...i, comments: next } : i)))
+    await supabase.from('issues').update({ comments: next }).eq('id', issueId)
+    return null
+  }, [])
+
+  // ---- delete issue (reporter or admin; removes its comments too) ----
+  const deleteIssue = useCallback(async (issueId: string): Promise<string | null> => {
+    if (!supabase) return null // demo mode: local-only, nothing to delete
+    const { error } = await supabase.rpc('delete_issue', { p_issue_id: issueId })
+    if (error) return friendlyDbError(error.message)
+    // Optimistic cleanup in case realtime is delayed.
+    setIssues((prev) => prev.filter((i) => i.id !== issueId))
+    setComments((prev) => {
+      const next = { ...prev }
+      delete next[issueId]
+      return next
+    })
+    return null
+  }, [])
+
+  // ---- admin: citizen directory ----
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+
+  const loadAdminUsers = useCallback(async (search?: string) => {
+    if (!supabase) return
+    const { data, error } = await supabase.rpc('admin_list_users', { p_search: search ?? '' })
+    if (error) {
+      console.warn('admin_list_users failed:', error.message)
+      return
+    }
+    if (Array.isArray(data)) setAdminUsers(data as AdminUser[])
+  }, [])
+
+  const removeUser = useCallback(async (userId: string): Promise<string | null> => {
+    if (!supabase) return 'Admin portal requires Supabase to be configured'
+    const { error } = await supabase.rpc('admin_delete_user', { p_user_id: userId })
+    if (error) return friendlyDbError(error.message)
+    setAdminUsers((prev) => prev.filter((u) => u.user_id !== userId))
+    // Drop their content from the local feed too.
+    setIssues((prev) => prev.filter((i) => i.user_id !== userId))
+    return null
+  }, [])
+
   // ---- comments ----
   const addComment = useCallback((issueId: string, text: string) => {
     const t = text.trim()
@@ -1096,6 +1168,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ensureIssue,
       comments,
       addComment,
+      deleteComment,
+      deleteIssue,
+      adminUsers,
+      loadAdminUsers,
+      removeUser,
       notifications,
       unreadCount,
       markRead,
@@ -1115,7 +1192,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       issues, area, setArea, appError, clearAppError, sessionReady, profileResolved, loggedIn, user, login, logout, profile, needsOnboarding,
       saveProfile, sendEmailOtp, verifyEmailOtp, loginWithGoogle, authError, clearAuthError, sendPasswordReset, updatePassword,
       upvoted, toggleUpvote, following, toggleFollow, reactions, reactToOfficial, addIssue, ensureIssue,
-      comments, addComment, notifications, unreadCount, markRead, markAllRead, org, loginOrg,
+      comments, addComment, deleteComment, deleteIssue, adminUsers, loadAdminUsers, removeUser,
+      notifications, unreadCount, markRead, markAllRead, org, loginOrg,
       registerOrg, logoutOrg, pendingOrgs, loadPendingOrgs, approveOrg, postOfficialUpdate,
       settings, setSetting,
     ],

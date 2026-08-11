@@ -138,3 +138,14 @@ export interface Area {
   lat: number
   lng: number
 }
+
+/** Admin-only view of a citizen account (via admin_list_users RPC). */
+export interface AdminUser {
+  user_id: string
+  email: string | null
+  username: string | null
+  home_area: string | null
+  created_at: string
+  issues_count: number
+  comments_count: number
+}

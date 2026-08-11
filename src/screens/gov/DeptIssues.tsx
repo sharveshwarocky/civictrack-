@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Camera, Check, ChevronDown, ExternalLink, MessageSquare, Send, ThumbsUp, Timer } from 'lucide-react'
+import { Camera, Check, ChevronDown, ExternalLink, MessageSquare, Send, ThumbsUp, Timer, Trash2 } from 'lucide-react'
 import { StatusChip } from '../../components/StatusChip'
 import { compact, formatINR, relativeTime, slaInfo } from '../../lib/format'
 import { CATEGORY_META } from '../../lib/constants'
@@ -47,11 +47,12 @@ const EMPTY: Draft = {
 }
 
 export default function DeptIssues() {
-  const { issues, org, postOfficialUpdate } = useApp()
+  const { issues, org, postOfficialUpdate, deleteIssue } = useApp()
   const navigate = useNavigate()
   const [filter, setFilter] = useState<Filter>('all')
   const [openId, setOpenId] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, Draft>>({})
+  const [confirmDel, setConfirmDel] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const fileFor = useRef<string | null>(null)
 
@@ -102,6 +103,25 @@ export default function DeptIssues() {
     const reader = new FileReader()
     reader.onload = () => patch(fileFor.current!, { afterPhoto: String(reader.result) })
     reader.readAsDataURL(f)
+  }
+
+  const armDelete = (id: string) => {
+    if (confirmDel === id) {
+      setConfirmDel(null)
+      return
+    }
+    setConfirmDel(id)
+    window.setTimeout(() => setConfirmDel((cur) => (cur === id ? null : cur)), 4000)
+  }
+
+  const removeIssue = async (id: string) => {
+    setConfirmDel(null)
+    const err = await deleteIssue(id)
+    if (err) {
+      console.warn('delete issue failed:', err)
+      return
+    }
+    if (openId === id) setOpenId(null)
   }
 
   const post = async (issue: Issue) => {
@@ -204,6 +224,22 @@ export default function DeptIssues() {
                     >
                       <ExternalLink size={10} /> View public report
                     </button>
+                    {org.role === 'admin' &&
+                      (confirmDel === i.id ? (
+                        <button
+                          onClick={() => void removeIssue(i.id)}
+                          className="flex items-center gap-1 rounded-lg bg-red px-2.5 py-1.5 text-[10px] font-bold text-white transition-transform active:scale-95"
+                        >
+                          <Trash2 size={10} /> Confirm delete?
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => armDelete(i.id)}
+                          className="flex items-center gap-1 rounded-lg border border-red/20 bg-red/5 px-2.5 py-1.5 text-[10px] font-semibold text-red transition-colors hover:bg-red/10"
+                        >
+                          <Trash2 size={10} /> Delete report
+                        </button>
+                      ))}
                     {i.official && (
                       <span className="text-[10px] text-muted">Last update: {relativeTime(i.official.postedAt)}</span>
                     )}

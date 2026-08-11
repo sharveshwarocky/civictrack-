@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck, BellPlus, Clock, MapPin, Share2, ThumbsUp } from 'lucide-react'
+import { ArrowLeft, BadgeCheck, BellPlus, Clock, MapPin, Share2, ThumbsUp, Trash2 } from 'lucide-react'
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider'
 import { BudgetBar } from '../components/BudgetBar'
 import { CivicMap } from '../components/CivicMap'
@@ -24,11 +24,14 @@ export default function IssueDetail() {
     reactToOfficial,
     comments,
     addComment,
+    deleteComment,
+    deleteIssue,
     profile,
     loggedIn,
     ensureIssue,
   } = useApp()
   const [comment, setComment] = useState('')
+  const [confirmDel, setConfirmDel] = useState<string | null>(null) // 'issue' | comment id
 
   const issue = issues.find((i) => i.id === id)
 
@@ -67,6 +70,34 @@ export default function IssueDetail() {
     setComment('')
   }
 
+  // Two-step inline confirm for destructive actions (post / comment).
+  const armDelete = (key: string) => {
+    if (confirmDel === key) {
+      setConfirmDel(null)
+      return
+    }
+    setConfirmDel(key)
+    window.setTimeout(() => setConfirmDel((cur) => (cur === key ? null : cur)), 4000)
+  }
+
+  const confirmDeleteIssue = async () => {
+    setConfirmDel(null)
+    const err = await deleteIssue(issue.id)
+    if (err) {
+      console.warn('delete issue failed:', err)
+      return
+    }
+    navigate('/app/home', { replace: true })
+  }
+
+  const confirmDeleteComment = async (commentId: string) => {
+    setConfirmDel(null)
+    const err = await deleteComment(issue.id, commentId)
+    if (err) console.warn('delete comment failed:', err)
+  }
+
+  const canDeletePost = isMine(issue.user_id)
+
   return (
     <div className="min-h-dvh bg-bg">
       {/* hero */}
@@ -80,12 +111,32 @@ export default function IssueDetail() {
             >
               <ArrowLeft size={19} />
             </button>
-            <button
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition-transform active:scale-90"
-              aria-label="Share"
-            >
-              <Share2 size={17} />
-            </button>
+            <div className="flex gap-2">
+              {canDeletePost &&
+                (confirmDel === 'issue' ? (
+                  <button
+                    onClick={() => void confirmDeleteIssue()}
+                    className="flex items-center gap-1.5 rounded-full bg-red px-3.5 py-2.5 text-[12px] font-bold text-white backdrop-blur-md transition-transform active:scale-95"
+                  >
+                    <Trash2 size={14} /> Confirm delete?
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => armDelete('issue')}
+                    className="flex h-10 w-10 items-center justify-center rounded-full bg-red/80 text-white backdrop-blur-md transition-transform active:scale-90 hover:bg-red"
+                    aria-label="Delete report"
+                    title="Delete this report"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                ))}
+              <button
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition-transform active:scale-90"
+                aria-label="Share"
+              >
+                <Share2 size={17} />
+              </button>
+            </div>
           </div>
           <div className="absolute bottom-4 left-4 z-10 flex gap-2">
             <CategoryChip label={cat.label} emoji={cat.emoji} />
@@ -311,6 +362,24 @@ export default function IssueDetail() {
                   <div className="flex items-center gap-2 text-[12px] font-bold">
                     {mine ? <span className="text-green">You</span> : name}
                     <span className="text-[10px] font-medium text-muted">{c.created_at ? relativeTime(c.created_at) : c.time}</span>
+                    {mine &&
+                      (confirmDel === c.id ? (
+                        <button
+                          onClick={() => void confirmDeleteComment(c.id)}
+                          className="ml-auto flex items-center gap-1 rounded-full bg-red px-2 py-0.5 text-[10px] font-bold text-white transition-transform active:scale-95"
+                        >
+                          <Trash2 size={11} /> Confirm?
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => armDelete(c.id)}
+                          className="ml-auto flex h-6 w-6 items-center justify-center rounded-full text-faint transition-colors hover:bg-red/10 hover:text-red"
+                          aria-label="Delete comment"
+                          title="Delete comment"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      ))}
                   </div>
                   <p className="mt-0.5 text-[13px] leading-relaxed text-ink/85">{c.text}</p>
                 </div>

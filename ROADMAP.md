@@ -45,8 +45,16 @@
 ## Validation at the end of every phase
 `npx tsc -b --noEmit` → `npm run build` → `npx vitest run` → browser pass on affected flows.
 
-## Phase 5 — Organization onboarding (in progress)
-- [ ] Fix `post_official_update` overload (Phase 3 `create or replace` left a stale 10-param signature → PGRST203) — `upgrade-phase5.sql`
-- [ ] Verify org sign-up → admin approval → portal login end-to-end over HTTPS
-- [ ] Bootstrap first admin account (dashboard user + `role: org` metadata + approved row)
-- [ ] Confirm org work panel posts updates (with & without contractor)
+## Phase 5 — Organization onboarding ✅
+- [x] Fix `post_official_update` overload (Phase 3 `create or replace` left a stale 10-param signature → PGRST203) — `upgrade-phase5.sql`
+- [x] Verify org sign-up → admin approval → portal login end-to-end over HTTPS
+- [x] Bootstrap first admin account (dashboard user + `role: org` metadata + approved row)
+- [x] Confirm org work panel posts updates (with & without contractor)
+
+## Phase 6 — Content deletion & citizen moderation (in progress)
+- [ ] RLS delete policies: report owner **or** approved admin can delete issues & comments — `upgrade-phase6.sql`
+- [ ] `delete_issue` RPC removes the report + its comments atomically (comments have no FK to issues)
+- [ ] `admin_list_users` / `admin_delete_user` RPCs — admin can search citizens & remove accounts (+ all their content)
+- [ ] UI: citizen deletes own report & comments (IssueDetail, two-step confirm)
+- [ ] UI: admin deletes any report in the gov Issues panel; Admin panel gets Citizens search + Comments moderation tabs
+- [ ] Run `upgrade-phase6.sql` in the SQL editor, then verify all flows live
