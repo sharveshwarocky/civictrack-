@@ -57,6 +57,7 @@ export default function IssueDetail() {
   const isUpvoted = !!upvoted[issue.id]
   const isFollowing = !!following[issue.id]
   const isCompleted = issue.status === 'completed'
+  const sla = slaInfo(issue)
   const isMine = (uid?: string | null) => !!profile && !!uid && uid === profile.user_id
 
   const postComment = () => {
@@ -204,17 +205,17 @@ export default function IssueDetail() {
               🏗️ Contractor: <span className="font-semibold text-ink">{issue.contractor}</span>
             </p>
           )}
-          {(issue.expectedAt || issue.expected) && (
+          {(issue.expectedAt || issue.expected) && !isCompleted && (
             <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-muted">
               📅 Expected completion:{' '}
               <span
                 className={`font-semibold ${
-                  slaInfo(issue)?.tone === 'overdue' ? 'text-red' : slaInfo(issue)?.tone === 'warn' ? 'text-orange' : 'text-ink'
+                  sla?.tone === 'overdue' ? 'text-red' : sla?.tone === 'warn' ? 'text-orange' : 'text-ink'
                 }`}
               >
                 {shortDate(issue.expectedAt) ?? issue.expected}
               </span>
-              {slaInfo(issue) && <span className="text-faint">· {slaInfo(issue)!.text}</span>}
+              {sla && <span className="text-faint">· {sla.text}</span>}
             </p>
           )}
         </div>
