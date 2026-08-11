@@ -558,9 +558,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /** Real Supabase email OTP — resolves error message or null on success. */
   const sendEmailOtp = useCallback(async (email: string): Promise<string | null> => {
     if (!supabase) return null // demo mode: any email works
+    // emailRedirectTo makes the magic link in the OTP email land on the CURRENT
+    // origin (the deployed URL in prod, localhost in dev) instead of Supabase's
+    // configured Site URL — without it, clicks bounce to localhost:5173.
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { shouldCreateUser: true },
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: window.location.origin + '/app/home',
+      },
     })
     return error?.message ?? null
   }, [])

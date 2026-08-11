@@ -98,12 +98,24 @@ and use the **Admin** tab to approve/reject new organizations.
 - Unit tests: `npm test` (vitest) covers the formatters, anonymous-username
   generator and area geolocation resolver.
 
-## Password-reset redirect URLs (Phase 3)
+## Auth redirects — Site URL & Redirect URLs (critical)
 
-The org "Forgot password?" flow uses `resetPasswordForEmail` with `redirectTo` `/reset-password`.
-Add these to **Supabase → Authentication → URL Configuration → Redirect URLs** or the email link breaks:
+**Symptom:** on the deployed site, logging in never gets past the login page and
+raises a *"localhost refused to connect"* error.
 
-- `http://localhost:5173` (dev)
-- `https://civictrack-sepia.vercel.app` (production)
+**Cause:** Supabase Auth builds the magic link inside OTP/verification emails from
+the project's **Site URL** (default `http://localhost:5173`). Clicking that link on
+the deployed site tries to open `localhost:5173` on the visitor's machine → refused.
 
-Also keep your **Site URL** set to the deployed origin so recovery links land correctly.
+**Fix (dashboard, Authentication → URL Configuration):**
+
+1. **Site URL** → `https://civictrack-sepia.vercel.app` (your deployed origin)
+2. **Redirect URLs** — add BOTH:
+   - `http://localhost:5173` (dev)
+   - `https://civictrack-sepia.vercel.app` (production)
+
+**Code side (already handled):** `sendEmailOtp` passes
+`emailRedirectTo: window.location.origin + '/app/home'`, so the OTP email link
+lands on the current origin (deployed URL in prod, localhost in dev) regardless of
+Site URL. The Google OAuth and org password-reset flows already pass explicit
+`redirectTo` values too.
