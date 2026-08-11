@@ -294,4 +294,89 @@ export const CITY_COORDS: CityCoord[] = [
   ['Wellington', 'New Zealand', -41.2866, 174.7756], ['Christchurch', 'New Zealand', -43.5321, 172.6362], ['Suva', 'Fiji', -18.1416, 178.4419],
   ['Port Moresby', 'Papua New Guinea', -9.4438, 147.1803], ['Noumea', 'New Caledonia', -22.2758, 166.458], ['Papeete', 'French Polynesia', -17.5516, -149.5585],
   ['Honiara', 'Solomon Islands', -9.4456, 159.9729], ['Port Vila', 'Vanuatu', -17.7333, 168.3273],
+  // ---- India tier-2/3 (dense coverage so any Indian location resolves accurately) ----
+  // Tamil Nadu
+  ['Kanyakumari', 'India', 8.0883, 77.5385], ['Cuddalore', 'India', 11.7447, 79.7685], ['Kanchipuram', 'India', 12.8342, 79.7039],
+  ['Nagapattinam', 'India', 10.7676, 79.8437], ['Thoothukudi', 'India', 8.7642, 78.1348], ['Hosur', 'India', 12.7409, 77.8253],
+  ['Ramanathapuram', 'India', 9.3716, 78.8348], ['Pudukkottai', 'India', 10.3813, 78.8167], ['Sivakasi', 'India', 9.45, 77.804],
+  ['Rajapalayam', 'India', 9.4533, 77.5533], ['Ooty', 'India', 11.4102, 76.695], ['Kodaikanal', 'India', 10.2381, 77.4892],
+  ['Tirupathur', 'India', 12.4958, 78.5679], ['Aruppukottai', 'India', 9.51, 78.0959], ['Pollachi', 'India', 10.6573, 77.0074],
+  ['Mettupalayam', 'India', 11.3, 76.95], ['Chidambaram', 'India', 11.3981, 79.6937], ['Mayiladuthurai', 'India', 11.1018, 79.6552],
+  // Kerala
+  ['Thiruvananthapuram', 'India', 8.5241, 76.9366], ['Thrissur', 'India', 10.5276, 76.2144], ['Kozhikode', 'India', 11.2588, 75.7804],
+  ['Kannur', 'India', 11.8745, 75.3704], ['Kollam', 'India', 8.8932, 76.6141], ['Alappuzha', 'India', 9.4981, 76.3388],
+  ['Palakkad', 'India', 10.7867, 76.6548], ['Kottayam', 'India', 9.5916, 76.5222], ['Malappuram', 'India', 11.0732, 76.0785],
+  ['Kasaragod', 'India', 12.4996, 74.9869], ['Kalpetta', 'India', 11.6262, 76.0833], ['Pathanamthitta', 'India', 9.2648, 76.787],
+  ['Idukki', 'India', 9.8513, 76.9413],
+  // Karnataka
+  ['Davanagere', 'India', 14.4644, 75.9218], ['Ballari', 'India', 15.1394, 76.9214], ['Udupi', 'India', 13.3409, 74.7421],
+  ['Shivamogga', 'India', 13.9299, 75.5681], ['Tumakuru', 'India', 13.3379, 77.1173], ['Hassan', 'India', 13.0072, 76.0962],
+  ['Raichur', 'India', 16.2103, 77.3437], ['Bidar', 'India', 17.9104, 77.5199], ['Vijayapura', 'India', 16.8302, 75.71],
+  ['Chitradurga', 'India', 14.2221, 76.4006], ['Mandya', 'India', 12.5223, 76.8954], ['Kolar', 'India', 13.1365, 78.1297],
+  ['Chikkamagaluru', 'India', 13.3233, 75.7743], ['Madikeri', 'India', 12.4244, 75.7382], ['Gadag', 'India', 15.4298, 75.6317],
+  ['Bagalkot', 'India', 16.1869, 75.6961], ['Karwar', 'India', 14.8126, 74.1298],
+  // Andhra Pradesh & Telangana
+  ['Anantapur', 'India', 14.6819, 77.6006], ['Kadapa', 'India', 14.4674, 78.8241], ['Kurnool', 'India', 15.8281, 78.0373],
+  ['Ongole', 'India', 15.5057, 80.0499], ['Srikakulam', 'India', 18.2989, 83.8979], ['Vizianagaram', 'India', 18.1067, 83.4111],
+  ['Eluru', 'India', 16.7107, 81.0952], ['Nizamabad', 'India', 18.6725, 78.0941], ['Karimnagar', 'India', 18.4386, 79.1288],
+  ['Khammam', 'India', 17.2473, 80.1514], ['Mahabubnagar', 'India', 16.743, 77.985], ['Adilabad', 'India', 19.6718, 78.5334],
+  // Maharashtra
+  ['Solapur', 'India', 17.6599, 75.9064], ['Latur', 'India', 18.4088, 76.5604], ['Sangli', 'India', 16.8524, 74.5815],
+  ['Satara', 'India', 17.6805, 74.0183], ['Jalgaon', 'India', 21.0077, 75.5626], ['Dhule', 'India', 20.9042, 74.7749],
+  ['Malegaon', 'India', 20.5546, 74.5357], ['Chandrapur', 'India', 19.9615, 79.2961], ['Thane', 'India', 19.2183, 72.9781],
+  ['Navi Mumbai', 'India', 19.033, 73.0297], ['Kalyan', 'India', 19.2403, 73.1305], ['Bhiwandi', 'India', 19.3008, 73.0588],
+  ['Ulhasnagar', 'India', 19.2181, 73.1577], ['Panvel', 'India', 18.9881, 73.0985], ['Ratnagiri', 'India', 16.9902, 73.312],
+  // Gujarat
+  ['Gandhinagar', 'India', 23.2156, 72.6369], ['Anand', 'India', 22.5645, 72.9289], ['Nadiad', 'India', 22.6939, 72.8618],
+  ['Bharuch', 'India', 21.7051, 72.9959], ['Valsad', 'India', 20.6061, 72.9333], ['Navsari', 'India', 20.9467, 72.952],
+  ['Bhuj', 'India', 23.242, 69.6669], ['Gandhidham', 'India', 23.0753, 70.1317], ['Porbandar', 'India', 21.6424, 69.6093],
+  ['Junagadh', 'India', 21.5222, 70.4579], ['Morbi', 'India', 22.8173, 70.8378], ['Surendranagar', 'India', 22.7271, 71.6487],
+  ['Mehsana', 'India', 23.588, 72.3693], ['Palanpur', 'India', 24.1716, 72.4344],
+  // Rajasthan
+  ['Sikar', 'India', 27.6094, 75.1399], ['Pali', 'India', 25.7711, 73.3235], ['Bhilwara', 'India', 25.3506, 74.635],
+  ['Tonk', 'India', 26.1667, 75.79], ['Chittorgarh', 'India', 24.888, 74.6267], ['Banswara', 'India', 23.5439, 74.4333],
+  ['Ganganagar', 'India', 29.9038, 73.8772], ['Hanumangarh', 'India', 29.5816, 74.3293],
+  // Punjab & Haryana
+  ['Hisar', 'India', 29.1492, 75.7217], ['Gurugram', 'India', 28.4595, 77.0266], ['Ambala', 'India', 30.3752, 76.7821],
+  ['Kurukshetra', 'India', 29.9695, 76.8783], ['Yamunanagar', 'India', 30.129, 77.2674], ['Sonipat', 'India', 28.9931, 77.0151],
+  // Uttar Pradesh
+  ['Ghaziabad', 'India', 28.6692, 77.4538], ['Aligarh', 'India', 27.8974, 78.0881], ['Moradabad', 'India', 28.8386, 78.7733],
+  ['Firozabad', 'India', 27.1592, 78.3958], ['Hathras', 'India', 27.5954, 78.0529], ['Bulandshahr', 'India', 28.4039, 77.8576],
+  ['Muzaffarnagar', 'India', 29.4707, 77.7033], ['Rampur', 'India', 28.8095, 79.0277], ['Shahjahanpur', 'India', 27.8832, 79.9121],
+  ['Ayodhya', 'India', 26.7799, 82.1333], ['Basti', 'India', 26.8095, 82.7641], ['Rae Bareli', 'India', 26.2311, 81.2429],
+  ['Sultanpur', 'India', 26.2679, 82.0723],
+  // Bihar
+  ['Gaya', 'India', 24.7914, 85.0002], ['Purnia', 'India', 25.7771, 87.4753], ['Arrah', 'India', 25.556, 84.6633],
+  ['Begusarai', 'India', 25.4189, 86.1248], ['Katihar', 'India', 25.5339, 87.5744], ['Sasaram', 'India', 24.9491, 84.0319],
+  ['Motihari', 'India', 26.6574, 84.9166],
+  // West Bengal
+  ['Howrah', 'India', 22.5958, 88.2636], ['Bardhaman', 'India', 23.2406, 87.8695], ['Malda', 'India', 25.0108, 88.1411],
+  ['Kharagpur', 'India', 22.346, 87.232], ['Haldia', 'India', 22.0605, 88.1097], ['Darjeeling', 'India', 27.041, 88.2669],
+  ['Jalpaiguri', 'India', 26.5276, 88.9164], ['Krishnanagar', 'India', 23.4057, 88.4907], ['Berhampore', 'India', 24.1086, 88.2568],
+  ['Midnapore', 'India', 22.2543, 87.6544],
+  // Madhya Pradesh
+  ['Rewa', 'India', 24.5362, 81.3037], ['Sagar', 'India', 23.8388, 78.7378], ['Satna', 'India', 24.6005, 80.8322],
+  ['Ratlam', 'India', 23.3345, 75.0369], ['Guna', 'India', 24.6417, 77.3148], ['Chhindwara', 'India', 22.0574, 78.9385],
+  ['Morena', 'India', 26.4933, 77.9919], ['Shivpuri', 'India', 25.4236, 77.6594], ['Vidisha', 'India', 23.5258, 77.8154],
+  // Odisha
+  ['Berhampur', 'India', 19.3136, 84.7941], ['Sambalpur', 'India', 21.4669, 83.9775], ['Puri', 'India', 19.8135, 85.8312],
+  ['Balasore', 'India', 21.4927, 86.9322], ['Baripada', 'India', 21.9334, 86.7394],
+  // Jharkhand
+  ['Deoghar', 'India', 24.4875, 86.6969], ['Chaibasa', 'India', 22.5491, 85.8091],
+  // Chhattisgarh
+  ['Bhilai', 'India', 21.1938, 81.3509], ['Bilaspur', 'India', 22.0797, 82.1391], ['Korba', 'India', 22.3595, 82.7502],
+  ['Raigarh', 'India', 21.8974, 83.3944], ['Ambikapur', 'India', 23.1188, 83.1942], ['Jagdalpur', 'India', 19.0739, 82.0336],
+  // North East
+  ['Silchar', 'India', 24.8333, 92.7789], ['Dibrugarh', 'India', 27.4728, 94.912], ['Jorhat', 'India', 26.7509, 94.2037],
+  ['Tezpur', 'India', 26.6499, 92.7927], ['Imphal', 'India', 24.817, 93.9368], ['Shillong', 'India', 25.5788, 91.8933],
+  ['Aizawl', 'India', 23.7271, 92.7176], ['Kohima', 'India', 25.6751, 94.1086], ['Itanagar', 'India', 27.0844, 93.6053],
+  ['Dimapur', 'India', 25.9113, 93.7218],
+  // J&K, Himachal & Uttarakhand
+  ['Dharamshala', 'India', 32.219, 76.3234], ['Manali', 'India', 32.2432, 77.1892], ['Solan', 'India', 30.9091, 77.1047],
+  ['Palampur', 'India', 32.1141, 76.5416], ['Haridwar', 'India', 29.9457, 78.1642], ['Rishikesh', 'India', 30.0869, 78.2676],
+  ['Nainital', 'India', 29.3919, 79.4542], ['Mussoorie', 'India', 30.4598, 78.0644], ['Roorkee', 'India', 29.8543, 77.888],
+  ['Haldwani', 'India', 29.2225, 79.5286], ['Almora', 'India', 29.5952, 79.6588],
+  // Goa & Union Territories
+  ['Panaji', 'India', 15.4909, 73.8278], ['Margao', 'India', 15.2832, 73.9862], ['Vasco da Gama', 'India', 15.3959, 73.8151],
+  ['Shimla', 'India', 31.1048, 77.1734], ['Leh', 'India', 34.1642, 77.5848], ['Gangtok', 'India', 27.3389, 88.6065], ['Tawang', 'India', 27.5857, 91.8595],
 ]

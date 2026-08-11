@@ -5,15 +5,18 @@ import { StatusChip } from '../../components/StatusChip'
 import { compact, formatINR, relativeTime, slaInfo } from '../../lib/format'
 import { CATEGORY_META } from '../../lib/constants'
 import { getDeptById } from '../../lib/departments'
+import { defaultTimeline, timelineForStatus } from '../../lib/timeline'
 import { useApp } from '../../lib/store'
 import type { Issue, Status, TimelineStep } from '../../lib/types'
 
 type Filter = 'all' | 'open' | 'overdue' | 'completed'
 
-const TIMELINE_LABELS = ['Reported', 'Inspected', 'Funded', 'In Progress', 'Completed']
-
-function defaultTimeline(): TimelineStep[] {
-  return TIMELINE_LABELS.map((label, i) => ({ label, date: i === 0 ? 'Today' : '—', done: i === 0 }))
+/** The status implied when each timeline step is turned on. */
+const STEP_STATUS: Partial<Record<string, Status>> = {
+  Inspected: 'under_review',
+  Funded: 'in_progress',
+  'In Progress': 'in_progress',
+  Completed: 'completed',
 }
 
 interface Draft {
@@ -96,12 +99,17 @@ export default function DeptIssues() {
 
   const toggleStep = (id: string, label: string) => {
     const d = drafts[id] ?? EMPTY
+    // 'Reported' is the origin — always done, never toggleable.
+    if (label === 'Reported') return
+    const turningOn = !d.timeline.find((s) => s.label === label)?.done
     const timeline = d.timeline.map((s) =>
-      s.label === label ? { ...s, done: !s.done, date: !s.done ? 'Today' : '—' } : s,
+      s.label === label ? { ...s, done: turningOn, date: turningOn ? 'Today' : '—' } : s,
     )
-    const step = timeline.find((s) => s.label === label)
-    // Keep the timeline and status consistent: turning on 'Completed' completes the issue.
-    const extra = label === 'Completed' && step?.done ? { status: 'completed' as const } : {}
+    // Turning a step ON also advances the status chip so they stay in sync.
+    const implied = turningOn ? STEP_STATUS[label] : undefined
+    const extra: Partial<Draft> = implied ? { status: implied } : {}
+    // If Completed is turned back off, revert to in-progress rather than lying.
+    if (label === 'Completed' && !turningOn && d.status === 'completed') extra.status = 'in_progress'
     patch(id, { timeline, timelineTouched: true, ...extra })
   }
 
@@ -320,7 +328,14 @@ export default function DeptIssues() {
                       {(['under_review', 'in_progress', 'completed'] as Status[]).map((s) => (
                         <button
                           key={s}
-                          onClick={() => patch(i.id, { status: d.status === s ? '' : s })}
+                          onClick={() =>
+                            patch(i.id, {
+                              status: d.status === s ? '' : s,
+                              // Keep the work timeline in sync with the chosen status.
+                              timeline: s !== d.status ? timelineForStatus(s, d.timeline) : d.timeline,
+                              timelineTouched: s !== d.status ? true : d.timelineTouched,
+                            })
+                          }
                           className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-all ${
                             d.status === s ? 'border-green/40 bg-green/10 text-green' : 'border-line bg-ink/[0.02] text-muted'
                           }`}

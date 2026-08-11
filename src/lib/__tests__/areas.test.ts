@@ -79,3 +79,29 @@ describe('recents (device-local)', () => {
     expect(list).toContain('Chennai')
   })
 })
+
+describe('India resolution (dense tier-2/3 coverage)', () => {
+  it('resolves Vellore to Vellore, not Chennai', () => {
+    // Vellore city centre
+    expect(resolveAreaName(12.9165, 79.1325)).toBe('Vellore')
+  })
+
+  it('resolves Shimla correctly', () => {
+    expect(resolveAreaName(31.1048, 77.1734)).toBe('Shimla')
+  })
+
+  it('resolves Madurai via the Chennai-localities list first', () => {
+    // Madurai is one of the AREAS localities
+    expect(resolveAreaName(9.9252, 78.1198)).toBe('Madurai')
+  })
+
+  it('still resolves Chennai localities with priority', () => {
+    expect(resolveAreaName(13.0878, 80.2101)).toBe('Anna Nagar')
+  })
+
+  it('nearbyAreas at a tier-2 city returns it within 350 km', () => {
+    const near = nearbyAreas(12.9165, 79.1325, 3)
+    expect(near[0].name).toBe('Vellore')
+    expect(near[0].km).toBeLessThan(5)
+  })
+})

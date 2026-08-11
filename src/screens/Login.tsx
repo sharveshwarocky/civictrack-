@@ -178,7 +178,7 @@ export default function Login() {
           {/* form */}
           {stage === 'email' ? (
             <>
-              <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Email address</label>
+              <label htmlFor="login-email" className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Email address</label>
               <div className="mt-2.5 flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3.5 transition-colors focus-within:border-green/40">
                 <Mail size={16} className="shrink-0 text-muted" />
                 <input
@@ -246,6 +246,7 @@ export default function Login() {
                 {otp.map((d, i) => (
                   <input
                     key={i}
+                    aria-label={`OTP digit ${i + 1} of 6`}
                     ref={(el) => { refs.current[i] = el }}
                     inputMode="numeric"
                     value={d}

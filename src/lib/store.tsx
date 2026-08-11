@@ -12,6 +12,7 @@ import { supabase } from './supabase'
 import { friendlyDbError } from './format'
 import { nextReaction } from './interactions'
 import { SLA_DAYS } from './constants'
+import { timelineForStatus } from './timeline'
 import { colorForUserId } from './username'
 import type {
   AdminUser,
@@ -1288,10 +1289,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         notifTitle = 'Progress updated'
         notifIcon = '📈'
       }
-      // Always computed (non-undefined) so it type-checks; only sent when completing.
-      const completedTimeline = (issue.timeline ?? DEFAULT_TIMELINE).map((s) =>
-        s.label === 'Completed' ? { ...s, date: 'Done', done: true } : s,
-      )
+      // Keep the public timeline truthful: an explicit timeline edit wins, but a
+      // bare status change must also advance the steps (they previously drifted).
+      const finalTimeline = data.timeline
+        ? data.timeline
+        : timelineForStatus(data.status ?? (issue.status as Status), issue.timeline)
       const { error } = await supabase.rpc('post_official_update', {
         p_issue_id: issueId,
         p_official: official,
@@ -1302,11 +1304,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...(afterCover ? { p_aftercover: afterCover } : {}),
         ...(data.contractor ? { p_contractor: data.contractor } : {}),
         p_clear_expected: isComplete,
-        ...(isComplete
-          ? { p_completed_at: new Date().toISOString(), p_timeline: completedTimeline }
-          : data.timeline
-            ? { p_timeline: data.timeline }
-            : {}),
+        p_timeline: finalTimeline,
+        ...(isComplete ? { p_completed_at: new Date().toISOString() } : {}),
       })
       if (error) return friendlyDbError(error.message)
       // Optimistically reflect the change locally so the org sees it instantly,
@@ -1327,11 +1326,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
                         completedAt: new Date().toISOString(),
                         expected: undefined,
                         completionPct: 100,
-                        timeline: completedTimeline,
                       }
-                    : data.timeline
-                      ? { timeline: data.timeline }
-                      : {}),
+                    : {}),
+                  timeline: finalTimeline,
                 }
               : i,
         ),

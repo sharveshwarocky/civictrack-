@@ -67,31 +67,28 @@ export function nearestKnownCity(lat: number, lng: number, maxKm = 200): CityCoo
 /** Closest N cities to a coordinate, sorted by distance (for the "nearby" list). */
 export function nearbyAreas(lat: number, lng: number, limit = 6): { name: string; country: string; km: number }[] {
   return CITY_COORDS.map((c) => ({ name: c[0], country: c[1], km: haversineKm(lat, lng, c[2], c[3]) }))
-    .filter((c) => c.km <= 250)
+    .filter((c) => c.km <= 350)
     .sort((a, b) => a.km - b.km)
     .slice(0, limit)
 }
 
-/** Best area label for a coordinate: Chennai locality first, then the nearest world city. */
+/** Best area label for a coordinate: nearest Chennai locality within 60 km, else the nearest world city. */
 export function resolveAreaName(lat: number, lng: number): string | undefined {
-  // Prefer Chennai localities within 60 km (they win nearest matching).
-  for (const a of AREAS) {
-    const km = haversineKm(lat, lng, a.lat, a.lng)
-    if (km <= 60) return a.name
-  }
-  const city = nearestKnownCity(lat, lng)
-  return city?.[0]
-}
-
-/** Nearest area name for a coordinate (legacy compat — now world-aware). */
-export function areaFromCoords(lat: number, lng: number, maxKm = 60): string | undefined {
+  // Prefer the NEAREST Chennai locality within 60 km (first-in-array matched a
+  // T. Nagar point to Anna Nagar before — that's the mis-detection users saw).
   let best: { name: string; km: number } | undefined
   for (const a of AREAS) {
     const km = haversineKm(lat, lng, a.lat, a.lng)
     if (!best || km < best.km) best = { name: a.name, km }
   }
-  if (best && best.km <= maxKm) return best.name
-  return nearestKnownCity(lat, lng)?.[0]
+  if (best && best.km <= 60) return best.name
+  const city = nearestKnownCity(lat, lng)
+  return city?.[0]
+}
+
+/** Nearest area name for a coordinate (legacy compat — now world-aware). */
+export function areaFromCoords(lat: number, lng: number): string | undefined {
+  return resolveAreaName(lat, lng)
 }
 
 /** Case-insensitive search across the full world dataset (name / country / region). */
