@@ -44,6 +44,12 @@ end $$;
 --    needs a SECURITY DEFINER helper to see all of them. Returns
 --    the auth identity plus username/home area plus activity.
 -- ============================================================
+-- ============================================================
+-- Phase 6 hotfix: admin_list_users type mismatch.
+-- auth.users.email is varchar(255); the declared return column is
+-- text, so PostgREST rejects the RPC with 42804. Cast explicitly.
+-- Safe to re-run (create or replace).
+-- ============================================================
 create or replace function admin_list_users(p_search text default '')
 returns table (
   user_id uuid,
@@ -62,11 +68,11 @@ begin
   end if;
   return query
     select
-      u.id,
-      u.email,
-      p.username,
-      p.home_area,
-      u.created_at,
+      u.id::uuid,
+      u.email::text,
+      p.username::text,
+      p.home_area::text,
+      u.created_at::timestamptz,
       (select count(*)::bigint from issues i where i.user_id = u.id::text),
       (select count(*)::bigint from comments c where c.user_id = u.id::text)
     from auth.users u

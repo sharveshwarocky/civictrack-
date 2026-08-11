@@ -29,7 +29,7 @@ function timeAgo(iso: string): string {
 type Tab = 'orgs' | 'citizens' | 'comments'
 
 export default function Admin() {
-  const { pendingOrgs, loadPendingOrgs, approveOrg, org, issues, comments, deleteComment, adminUsers, loadAdminUsers, removeUser } = useApp()
+  const { pendingOrgs, loadPendingOrgs, approveOrg, org, issues, comments, deleteComment, adminUsers, adminUsersError, loadAdminUsers, removeUser } = useApp()
   const [tab, setTab] = useState<Tab>('orgs')
   const [search, setSearch] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
@@ -203,7 +203,12 @@ export default function Admin() {
           }
         >
           <div className="space-y-2">
-            {adminUsers.length === 0 && (
+            {adminUsersError && (
+              <p className="rounded-xl border border-red/20 bg-red/5 px-4 py-3 text-[12px] font-medium leading-relaxed text-red">
+                Couldn't load citizens — {adminUsersError}
+              </p>
+            )}
+            {!adminUsersError && adminUsers.length === 0 && (
               <p className="py-8 text-center text-[12.5px] text-muted">
                 {search.trim() ? `No citizens match “${search.trim()}”.` : 'No citizen accounts yet — new sign-ups appear here.'}
               </p>

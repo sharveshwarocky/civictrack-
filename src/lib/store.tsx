@@ -104,6 +104,7 @@ interface AppState {
   deleteIssue: (issueId: string) => Promise<string | null>
   // admin: citizen moderation
   adminUsers: AdminUser[]
+  adminUsersError: string | null
   loadAdminUsers: (search?: string) => Promise<void>
   removeUser: (userId: string) => Promise<string | null>
   // notifications
@@ -861,14 +862,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // ---- admin: citizen directory ----
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
+  const [adminUsersError, setAdminUsersError] = useState<string | null>(null)
 
   const loadAdminUsers = useCallback(async (search?: string) => {
     if (!supabase) return
     const { data, error } = await supabase.rpc('admin_list_users', { p_search: search ?? '' })
     if (error) {
       console.warn('admin_list_users failed:', error.message)
+      setAdminUsersError(friendlyDbError(error.message))
+      setAdminUsers([])
       return
     }
+    setAdminUsersError(null)
     if (Array.isArray(data)) setAdminUsers(data as AdminUser[])
   }, [])
 
@@ -1171,6 +1176,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       deleteComment,
       deleteIssue,
       adminUsers,
+      adminUsersError,
       loadAdminUsers,
       removeUser,
       notifications,
@@ -1192,7 +1198,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       issues, area, setArea, appError, clearAppError, sessionReady, profileResolved, loggedIn, user, login, logout, profile, needsOnboarding,
       saveProfile, sendEmailOtp, verifyEmailOtp, loginWithGoogle, authError, clearAuthError, sendPasswordReset, updatePassword,
       upvoted, toggleUpvote, following, toggleFollow, reactions, reactToOfficial, addIssue, ensureIssue,
-      comments, addComment, deleteComment, deleteIssue, adminUsers, loadAdminUsers, removeUser,
+      comments, addComment, deleteComment, deleteIssue, adminUsers, adminUsersError, loadAdminUsers, removeUser,
       notifications, unreadCount, markRead, markAllRead, org, loginOrg,
       registerOrg, logoutOrg, pendingOrgs, loadPendingOrgs, approveOrg, postOfficialUpdate,
       settings, setSetting,
