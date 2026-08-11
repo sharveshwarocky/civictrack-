@@ -1,0 +1,283 @@
+@import "tailwindcss";
+
+/* ============================================
+   THEME TOKENS — dark (default) + light (.light)
+   Tailwind utilities read the --ct-* vars at
+   runtime, so adding `.light` to <html> flips
+   the whole app instantly.
+   ============================================ */
+@theme inline {
+  --color-bg: var(--ct-bg);
+  --color-surface: var(--ct-surface);
+  --color-surface2: var(--ct-surface2);
+  --color-surface3: var(--ct-surface3);
+  --color-line: var(--ct-line);
+  --color-line-light: var(--ct-line-light);
+  --color-green: var(--ct-green);
+  --color-green-muted: var(--ct-green-muted);
+  --color-red: var(--ct-red);
+  --color-orange: var(--ct-orange);
+  --color-blue: var(--ct-blue);
+  --color-purple: var(--ct-purple);
+  --color-ink: var(--ct-ink);
+  --color-soft: var(--ct-soft);
+  --color-muted: var(--ct-muted);
+  --color-faint: var(--ct-faint);
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+:root {
+  --ct-bg: #050505;
+  --ct-surface: #121212;
+  --ct-surface2: #1A1A1A;
+  --ct-surface3: #222222;
+  --ct-line: #262626;
+  --ct-line-light: #363636;
+  --ct-green: #00C853;
+  --ct-green-muted: #00E676;
+  --ct-red: #FF1744;
+  --ct-orange: #FF9100;
+  --ct-blue: #2979FF;
+  --ct-purple: #AA00FF;
+  --ct-ink: #F5F5F5;
+  --ct-soft: #A0A0A0;
+  --ct-muted: #737373;
+  --ct-faint: #555555;
+  --ct-frame-line: rgba(255, 255, 255, 0.04);
+  --ct-glass: rgba(18, 18, 18, 0.72);
+  --ct-glass-strong: rgba(10, 10, 10, 0.88);
+  color-scheme: dark;
+}
+
+html.light {
+  --ct-bg: #FAFAFA;
+  --ct-surface: #FFFFFF;
+  --ct-surface2: #F1F1F2;
+  --ct-surface3: #E8E8EA;
+  --ct-line: #E4E4E6;
+  --ct-line-light: #D2D2D6;
+  --ct-green: #00A844;
+  --ct-green-muted: #00C853;
+  --ct-red: #E01A3A;
+  --ct-orange: #E8830C;
+  --ct-blue: #1A73E8;
+  --ct-purple: #9C27B0;
+  --ct-ink: #101010;
+  --ct-soft: #4A4A4A;
+  --ct-muted: #6E6E73;
+  --ct-faint: #9E9EA4;
+  --ct-frame-line: rgba(0, 0, 0, 0.05);
+  --ct-glass: rgba(255, 255, 255, 0.72);
+  --ct-glass-strong: rgba(250, 250, 250, 0.88);
+  color-scheme: light;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+  letter-spacing: -0.01em;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ============================================
+   SHADOW SYSTEM
+   ============================================ */
+@layer utilities {
+  .shadow-float {
+    box-shadow: 0 0 0 1px rgba(127, 127, 127, 0.08), 0 4px 16px rgba(0, 0, 0, 0.35), 0 16px 48px rgba(0, 0, 0, 0.3);
+  }
+}
+
+html.light .shadow-float {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.08), 0 16px 48px rgba(0, 0, 0, 0.1);
+}
+
+/* ============================================
+   NOISE TEXTURE
+   ============================================ */
+.noise::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============================================
+   APP FRAMES
+   ============================================ */
+.app-frame {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: var(--ct-bg);
+  position: relative;
+  overflow-x: clip;
+}
+
+.gov-frame {
+  min-height: 100dvh;
+  background: var(--ct-bg);
+  position: relative;
+  overflow-x: hidden;
+}
+
+@media (min-width: 480px) {
+  .app-frame {
+    border-left: 1px solid var(--ct-frame-line);
+    border-right: 1px solid var(--ct-frame-line);
+  }
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* ============================================
+   MAP PINS
+   ============================================ */
+.civic-pin {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  border: 2.5px solid var(--ct-bg);
+  position: relative;
+}
+.civic-pin::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  border: 1px solid currentColor;
+  opacity: 0.4;
+  animation: pin-pulse 2.4s ease-out infinite;
+}
+/* (status color modifiers removed — pins use inline colors from CivicMap) */
+
+@keyframes pin-pulse {
+  0% { transform: scale(0.7); opacity: 0.7; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop {
+  0% { transform: scale(0.6); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.anim-rise { animation: rise-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.anim-fade { animation: fade-in 0.4s ease both; }
+.anim-pop { animation: pop 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* ============================================
+   COVER ART (gradient fallback)
+   ============================================ */
+.cover-art {
+  position: relative;
+  overflow: hidden;
+}
+.cover-art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
+}
+.cover-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.015) 0 1px, transparent 1px 12px);
+}
+.cover-art > * { position: relative; z-index: 1; }
+
+/* ============================================
+   SPLASH
+   ============================================ */
+@keyframes loader-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes logo-pulse {
+  0%, 100% { transform: translateY(0); box-shadow: 0 12px 40px rgba(0, 200, 83, 0.3); }
+  50% { transform: translateY(-4px); box-shadow: 0 18px 48px rgba(0, 200, 83, 0.45); }
+}
+.logo-tile { animation: logo-pulse 2.4s ease-in-out infinite; }
+
+/* ============================================
+   INTERACTIVE ELEMENTS
+   ============================================ */
+.btn-press { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.btn-press:active { transform: scale(0.97); }
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(127, 127, 127, 0.06), 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+html.light .card-hover:hover {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.07);
+}
+
+.nav-hover {
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+/* ============================================
+   LEAFLET MAP OVERRIDES (maps stay dark)
+   ============================================ */
+.leaflet-container {
+  background: #0A0A0A !important;
+  font-family: var(--font-sans) !important;
+}
+.leaflet-control-attribution {
+  background: rgba(10, 10, 10, 0.8) !important;
+  color: #555 !important;
+  font-size: 9px !important;
+  border-radius: 4px !important;
+}
+.leaflet-control-attribution a { color: #777 !important; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { display: none; }
+
+/* ============================================
+   DESKTOP EXPANSION
+   ============================================ */
+/* The phone-width frame (430px) is only for small screens. From 768px
+   upward the app expands to fill the viewport — no more phone strip. */
+@media (min-width: 768px) {
+  .app-frame {
+    max-width: none;
+    border-left: none;
+    border-right: none;
+    box-shadow: none;
+    overflow-x: visible;
+  }
+}
