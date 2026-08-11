@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bell, ChevronDown, MapPin, Search } from 'lucide-react'
 import { PostCard } from '../components/PostCard'
-import { AREAS } from '../lib/areas'
+import { LocationPicker } from '../components/LocationPicker'
 import { useApp } from '../lib/store'
 
 type Filter = 'all' | 'ongoing' | 'completed' | 'urgent'
@@ -15,12 +15,15 @@ const FILTERS: { key: Filter; label: string }[] = [
 ]
 
 export default function Home() {
-  const { issues, area, setArea, upvoted, toggleUpvote, unreadCount } = useApp()
+  const { issues, area, setArea, upvoted, toggleUpvote, unreadCount, hasMore, loadMore } = useApp()
   const navigate = useNavigate()
   const [areaOpen, setAreaOpen] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const loadingRef = useRef(false)
 
   const feed = issues
+    .filter((i) => !i.hidden) // realtime moderation takes effect live
     .filter((i) => (area ? i.area === area : true))
     .filter((i) => {
       if (filter === 'ongoing') return i.status === 'in_progress' || i.status === 'under_review' || i.status === 'reported'
@@ -29,18 +32,36 @@ export default function Home() {
       return true
     })
 
+  // Infinite scroll: load the next page when the sentinel enters the viewport.
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting || loadingRef.current) return
+        loadingRef.current = true
+        void loadMore().finally(() => {
+          loadingRef.current = false
+        })
+      },
+      { rootMargin: '600px 0px' },
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, loadMore, feed.length])
+
   return (
     <div className="min-h-dvh bg-bg">
       {/* header */}
       <header className="sticky top-0 z-30 border-b border-line/60 bg-bg/90 backdrop-blur-xl">
         <div className="flex items-center gap-2 px-4 pt-3.5 pb-0">
           <button
-            onClick={() => setAreaOpen((v) => !v)}
-            className="flex items-center gap-1.5 rounded-lg bg-ink/[0.04] px-3 py-1.5 text-[13px] font-semibold transition-colors nav-hover"
+            onClick={() => setAreaOpen(true)}
+            className="flex max-w-[60%] items-center gap-1.5 rounded-lg bg-ink/[0.04] px-3 py-1.5 text-[13px] font-semibold transition-colors nav-hover"
           >
-            <MapPin size={13} className="text-green" />
-            {area ?? 'Nearby'}
-            <ChevronDown size={12} className={`text-muted transition-transform ${areaOpen ? 'rotate-180' : ''}`} />
+            <MapPin size={13} className="shrink-0 text-green" />
+            <span className="truncate">{area ?? 'Nearby'}</span>
+            <ChevronDown size={12} className={`shrink-0 text-muted transition-transform ${areaOpen ? 'rotate-180' : ''}`} />
           </button>
           <div className="ml-auto flex items-center gap-1.5">
             <button
@@ -64,30 +85,6 @@ export default function Home() {
             </button>
           </div>
         </div>
-
-        {/* area dropdown */}
-        {areaOpen && (
-          <div className="absolute inset-x-0 top-full z-40 border-b border-line bg-surface shadow-float">
-            <div className="no-scrollbar max-h-72 overflow-y-auto p-2">
-              {AREAS.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => {
-                    setArea(a.name)
-                    setAreaOpen(false)
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors nav-hover ${
-                    area === a.name ? 'bg-ink/[0.04]' : ''
-                  }`}
-                >
-                  <span className="text-sm">{a.emoji}</span>
-                  <span className="flex-1 text-[13px] font-medium">{a.name}</span>
-                  {area === a.name && <span className="h-1.5 w-1.5 rounded-full bg-green" />}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* filter chips */}
         <div className="no-scrollbar flex gap-1.5 overflow-x-auto px-4 py-2.5">
@@ -124,11 +121,24 @@ export default function Home() {
             </button>
           </div>
         ) : (
-          feed.map((issue) => (
-            <PostCard key={issue.id} issue={issue} upvoted={!!upvoted[issue.id]} onUpvote={toggleUpvote} />
-          ))
+          <>
+            {feed.map((issue) => (
+              <PostCard key={issue.id} issue={issue} upvoted={!!upvoted[issue.id]} onUpvote={toggleUpvote} />
+            ))}
+            {/* infinite-scroll sentinel */}
+            <div ref={sentinelRef} className="flex items-center justify-center py-6">
+              {hasMore ? (
+                <span className="h-5 w-5 animate-spin rounded-full border-2 border-green/30 border-t-green" />
+              ) : (
+                <span className="text-[11px] text-faint">You're all caught up 🎉</span>
+              )}
+            </div>
+          </>
         )}
       </main>
+
+      {/* world location chooser */}
+      <LocationPicker open={areaOpen} onClose={() => setAreaOpen(false)} onSelect={setArea} current={area} />
     </div>
   )
 }

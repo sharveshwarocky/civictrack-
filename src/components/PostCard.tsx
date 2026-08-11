@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BadgeCheck, MapPin, MessageCircle, Share2, ThumbsUp, Timer, Users, Wallet } from 'lucide-react'
+import { BadgeCheck, Link2, MapPin, MessageCircle, Share2, ThumbsUp, Timer, Users, Wallet } from 'lucide-react'
 import { budgetShort, compact, relativeTime, slaInfo } from '../lib/format'
 import { CATEGORY_META } from '../lib/constants'
 import type { Issue } from '../lib/types'
 import { Avatar } from './Avatar'
-import { CoverImage } from './CoverImage'
+import { CommentSheet } from './CommentSheet'
+import { PhotoCarousel } from './PhotoCarousel'
 import { CategoryChip, StatusChip } from './StatusChip'
 
 export function PostCard({
@@ -18,6 +20,31 @@ export function PostCard({
 }) {
   const cat = CATEGORY_META[issue.category]
   const sla = slaInfo(issue)
+  const [commentsOpen, setCommentsOpen] = useState(false)
+  const [shareMsg, setShareMsg] = useState<string | null>(null)
+  const photos = issue.photos?.length ? issue.photos : [issue.cover]
+
+  const share = async () => {
+    setShareMsg(null)
+    const url = window.location.origin + `/issue/${issue.id}`
+    const text = `${issue.title} — report on CivicTrack`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: text, url })
+        return
+      } catch {
+        /* fall through to copy */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareMsg('Link copied 🔗')
+      window.setTimeout(() => setShareMsg(null), 2000)
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <article className="anim-rise mb-5 overflow-hidden rounded-xl border border-line bg-surface transition-all card-hover">
       {/* header */}
@@ -39,9 +66,9 @@ export function PostCard({
         )}
       </div>
 
-      {/* media */}
+      {/* media — swipable when multiple photos */}
       <Link to={`/issue/${issue.id}`} className="block">
-        <CoverImage cover={issue.cover} className="relative mx-3.5 mt-3 h-56 overflow-hidden rounded-lg">
+        <PhotoCarousel photos={photos} className="relative mx-3.5 mt-3 h-56 overflow-hidden rounded-lg">
           <div className="absolute left-2.5 top-2.5 z-10 flex flex-wrap gap-1.5">
             <CategoryChip label={cat.label} emoji={cat.emoji} />
             <StatusChip status={issue.status} />
@@ -64,7 +91,7 @@ export function PostCard({
               </div>
             </div>
           )}
-        </CoverImage>
+        </PhotoCarousel>
       </Link>
 
       {/* title + description */}
@@ -101,12 +128,25 @@ export function PostCard({
           <ThumbsUp size={15} className={upvoted ? 'anim-pop' : ''} />
           {compact(issue.upvotes)}
         </button>
-        <button className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-semibold text-muted nav-hover">
+        <button
+          onClick={() => setCommentsOpen(true)}
+          className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-semibold text-muted transition-all nav-hover hover:bg-ink/5 hover:text-soft"
+          aria-label="Comments"
+        >
           <MessageCircle size={15} /> {issue.comments}
         </button>
-        <button className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-semibold text-muted nav-hover">
+        <button
+          onClick={() => void share()}
+          className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-[12px] font-semibold text-muted transition-all nav-hover hover:bg-ink/5 hover:text-soft"
+          aria-label="Share"
+        >
           <Share2 size={15} />
         </button>
+        {shareMsg && (
+          <span className="flex items-center gap-1 text-[10.5px] font-semibold text-green">
+            <Link2 size={11} /> {shareMsg}
+          </span>
+        )}
         <Link
           to={`/app/map?focus=${issue.id}`}
           className="ml-auto flex items-center gap-1.5 rounded-lg px-3 py-2.5 text-[12px] font-semibold text-blue nav-hover"
@@ -130,6 +170,8 @@ export function PostCard({
           <p className="mt-2 text-[12px] leading-relaxed text-soft">{issue.official.text}</p>
         </div>
       )}
+
+      <CommentSheet issueId={issue.id} open={commentsOpen} onClose={() => setCommentsOpen(false)} />
     </article>
   )
 }

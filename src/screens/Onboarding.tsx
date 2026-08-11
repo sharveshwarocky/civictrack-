@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Check, Dices, LocateFixed, MapPin, RefreshCw, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Dices, Loader2, LocateFixed, MapPin, RefreshCw, ShieldCheck } from 'lucide-react'
 import { AREAS, areaFromCoords } from '../lib/areas'
+import { LocationPicker } from '../components/LocationPicker'
 import { getCurrentCoords } from '../lib/geo'
 import { useApp } from '../lib/store'
 import { colorForSeed, randomUsername } from '../lib/username'
 
 export default function Onboarding() {
-  const { saveProfile, profile } = useApp()
+  const { saveProfile, profile, checkUsername } = useApp()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const isEdit = searchParams.get('edit') === '1'
@@ -18,6 +19,52 @@ export default function Onboarding() {
   const [locating, setLocating] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [worldPickOpen, setWorldPickOpen] = useState(false)
+  // live availability check (Phase 8)
+  const [taken, setTaken] = useState<boolean | null>(null)
+  const [checking, setChecking] = useState(false)
+  const checkTimer = useRef<number | null>(null)
+  const checkedRef = useRef<Set<string>>(new Set())
+
+  const rawName = username.trim()
+  const valid = rawName.length >= 3
+  const available = valid && (isEdit && rawName === profile?.username ? true : taken === false)
+  const tooShort = rawName.length > 0 && rawName.length < 3
+
+  // Debounced availability check against the live profiles table.
+  useEffect(() => {
+    if (!valid) {
+      setTaken(null)
+      return
+    }
+    const key = rawName.toLowerCase()
+    if (isEdit && rawName === profile?.username) {
+      setTaken(null) // own name is always free
+      return
+    }
+    if (checkedRef.current.has(key)) return // already answered for this name
+    setChecking(true)
+    if (checkTimer.current) window.clearTimeout(checkTimer.current)
+    checkTimer.current = window.setTimeout(async () => {
+      const isTaken = await checkUsername(rawName)
+      checkedRef.current.add(key)
+      setTaken(isTaken)
+      setChecking(false)
+    }, 350)
+    return () => {
+      if (checkTimer.current) window.clearTimeout(checkTimer.current)
+    }
+  }, [rawName, valid, checkUsername, isEdit, profile?.username])
+
+  const next = () => {
+    if (!valid) return
+    if (taken === true) {
+      setError('That username is already taken — try another or roll the dice.')
+      return
+    }
+    setError('')
+    setStep('area')
+  }
 
   const locate = async () => {
     if (locating) return
@@ -116,13 +163,29 @@ export default function Onboarding() {
                   <Dices size={17} />
                 </button>
               </div>
+              {tooShort && <p className="mt-3 text-center text-[11px] font-medium text-orange">Username must be at least 3 characters.</p>}
+              {valid && checking && (
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] font-medium text-muted">
+                  <Loader2 size={11} className="animate-spin" /> Checking availability…
+                </p>
+              )}
+              {valid && !checking && taken === true && !(isEdit && rawName === profile?.username) && (
+                <p className="mt-3 text-center text-[11px] font-medium text-red">
+                  @{rawName} is already taken — try another or roll the dice.
+                </p>
+              )}
+              {available && (
+                <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-[11px] font-medium text-green">
+                  <Check size={11} /> @{rawName} is available!
+                </p>
+              )}
               {error && <p className="mt-3 text-center text-[11px] font-medium text-red">{error}</p>}
               <p className="mt-3 text-center text-[11px] text-faint">Letters, numbers and underscores — 3-24 chars</p>
               <button
-                onClick={() => { setError(''); setStep('area') }}
-                disabled={username.trim().length < 3}
+                onClick={next}
+                disabled={!valid || taken === true || checking}
                 className={`mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-[14px] font-semibold transition-all btn-press ${
-                  username.trim().length >= 3
+                  available
                     ? 'bg-green text-bg shadow-[0_4px_20px_rgba(0,200,83,0.25)]'
                     : 'cursor-not-allowed bg-ink/[0.04] text-faint'
                 }`}
@@ -206,6 +269,17 @@ export default function Onboarding() {
                     {homeArea === a.name && <Check size={16} className="shrink-0 text-green" />}
                   </button>
                 ))}
+                <button
+                  onClick={() => setWorldPickOpen(true)}
+                  className="flex w-full items-center gap-3.5 rounded-xl border border-dashed border-line bg-surface/50 p-3.5 text-left transition-all card-hover hover:border-green/30"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-ink/[0.04] text-lg">🌍</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[14px] font-semibold">Search any city in the world</span>
+                    <span className="block text-[11px] text-muted">33,000+ cities — type to find yours</span>
+                  </span>
+                  {homeArea && !AREAS.some((a) => a.name === homeArea) && <Check size={16} className="shrink-0 text-green" />}
+                </button>
               </div>
 
               {error && <p className="mt-3 text-center text-[11px] font-medium text-red">{error}</p>}
@@ -230,6 +304,14 @@ export default function Onboarding() {
           </>
         )}
       </div>
+
+      {/* world search — pick any city as your home area */}
+      <LocationPicker
+        open={worldPickOpen}
+        onClose={() => setWorldPickOpen(false)}
+        onSelect={(name) => { setHomeArea(name); setError('') }}
+        current={homeArea}
+      />
     </div>
   )
 }

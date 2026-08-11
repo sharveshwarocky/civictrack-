@@ -1,45 +1,71 @@
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, ChevronRight, HelpCircle, Lock, LogOut, MapPin, Moon, Plus, Settings, Shield } from 'lucide-react'
+import { Bell, ChevronDown, ChevronRight, HelpCircle, Lock, LogOut, MapPin, Moon, Plus, Settings, Shield } from 'lucide-react'
 import { Avatar } from '../components/Avatar'
 import { CoverImage } from '../components/CoverImage'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { StatusChip } from '../components/StatusChip'
+import { AchievementModal } from '../components/AchievementModal'
+import { ACHIEVEMENTS, type Achievement } from '../lib/achievements'
 import { useApp } from '../lib/store'
 
-interface Achievement {
-  emoji: string
-  label: string
-  earned: boolean
-  desc: string
-}
+const VISIBLE = 12
 
 export default function Profile() {
-  const { issues, profile, user, logout } = useApp()
+  const { issues, comments, profile, user, logout } = useApp()
   const navigate = useNavigate()
+  const [showAll, setShowAll] = useState(false)
+  const [openAchievement, setOpenAchievement] = useState<Achievement | null>(null)
 
-  const mine = profile ? issues.filter((i) => i.user_id === profile.user_id) : []
+  const mine = useMemo(() => (profile ? issues.filter((i) => i.user_id === profile.user_id) : []), [issues, profile])
   const resolved = mine.filter((i) => i.status === 'completed').length
   const totalUpvotes = mine.reduce((s, i) => s + i.upvotes, 0)
-  const categories = new Set(mine.map((i) => i.category))
   const displayName = profile?.username ?? 'Citizen'
   const displayCity = profile?.home_area ?? '—'
   const avatarColor = profile?.avatar_color ?? '#00C853'
 
-  const achievements: Achievement[] = [
-    { emoji: '📝', label: 'First Report', earned: mine.length >= 1, desc: 'File your first report' },
-    { emoji: '🛣️', label: 'Road Warrior', earned: categories.has('Road'), desc: 'Report a road issue' },
-    { emoji: '💧', label: 'Water Watch', earned: categories.has('Water'), desc: 'Report a water issue' },
-    { emoji: '🗑️', label: 'Clean City', earned: categories.has('Garbage'), desc: 'Report a garbage issue' },
-    { emoji: '💡', label: 'Bright Spark', earned: categories.has('Electricity'), desc: 'Report an electricity issue' },
-    { emoji: '🌊', label: 'Drain Master', earned: categories.has('Drainage'), desc: 'Report a drainage issue' },
-    { emoji: '🔥', label: 'Trending', earned: totalUpvotes >= 500, desc: `${totalUpvotes} supports earned` },
-    { emoji: '✅', label: 'Problem Solver', earned: resolved >= 1, desc: 'Get a report resolved' },
-  ]
-  const earnedCount = achievements.filter((a) => a.earned).length
+  // ---- live stats for achievements ----
+  const stats = useMemo(() => {
+    // Real comment activity — from the live comments store, filtered to this user.
+    const myComments: string[] = []
+    let commentsPosted = 0
+    for (const list of Object.values(comments)) {
+      for (const c of list) {
+        if (profile && c.user_id === profile.user_id) {
+          commentsPosted += 1
+          if (!myComments.includes(c.issue_id)) myComments.push(c.issue_id)
+        }
+      }
+    }
+    const daysActive = profile?.created_at
+      ? Math.max(1, Math.floor((Date.now() - new Date(profile.created_at).getTime()) / 86400000))
+      : 1
+    // Verified = email-confirmed citizen who is active (3+ reports or 30 days).
+    const verified = !!user?.email && (mine.length >= 3 || daysActive >= 30)
+    return {
+      issues: mine,
+      resolved,
+      upvotes: totalUpvotes,
+      commentsPosted,
+      following: 0,
+      daysActive,
+      verified,
+      homeArea: profile?.home_area ?? null,
+      commentIssueIds: myComments,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mine, resolved, totalUpvotes, comments, profile?.user_id, profile?.created_at, profile?.home_area, user?.email])
+
+  const list = useMemo(
+    () => ACHIEVEMENTS.map((a) => ({ a, value: a.value(stats), earned: a.earned(stats) })),
+    [stats],
+  )
+  const earnedCount = list.filter((l) => l.earned).length
+  const visible = showAll ? list : list.slice(0, VISIBLE)
 
   const settings = [
     { icon: Moon, label: 'Appearance', sub: 'Dark, Light or System', to: '/app/settings' },
-    { icon: Bell, label: 'Notifications', sub: 'Push, email, budget alerts', to: '/app/settings' },
+    { icon: Bell, label: 'Notifications', sub: 'Push, email, weekly digest', to: '/app/settings' },
     { icon: Shield, label: 'Privacy & settings', sub: 'Account & data', to: '/app/settings' },
     { icon: HelpCircle, label: 'Help & support', sub: 'FAQ, contact ward office', to: '/app/settings' },
   ]
@@ -92,33 +118,51 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* achievements */}
+        {/* achievements — 51 live-computed, show more, tap for details */}
         <div className="mt-5">
           <div className="flex items-center justify-between">
             <h2 className="text-[15px] font-bold">Achievements</h2>
-            <span className="text-[11px] font-semibold text-green">{earnedCount} / {achievements.length} earned</span>
+            <span className="text-[11px] font-semibold text-green">{earnedCount} / {list.length} earned</span>
           </div>
           <div className="mt-2.5 grid grid-cols-4 gap-2">
-            {achievements.map((a) => (
-              <div
-                key={a.label}
-                title={a.earned ? a.desc : `Locked — ${a.desc}`}
-                className={`relative flex flex-col items-center rounded-2xl border px-2 py-3 transition-colors ${
-                  a.earned ? 'border-green/25 bg-green/5' : 'border-line bg-surface'
+            {visible.map(({ a, value, earned }) => (
+              <button
+                key={a.id}
+                onClick={() => setOpenAchievement(a)}
+                title={`${a.label} — ${a.desc}`}
+                className={`relative flex flex-col items-center rounded-2xl border px-2 py-3 transition-all active:scale-95 ${
+                  earned ? 'border-green/25 bg-green/5' : 'border-line bg-surface hover:border-line-light'
                 }`}
               >
-                <span className={`text-2xl ${a.earned ? '' : 'opacity-30 grayscale'}`}>{a.emoji}</span>
-                <span className={`mt-1.5 text-center text-[10px] font-semibold leading-tight ${a.earned ? 'text-ink' : 'text-muted'}`}>
+                <span className={`text-2xl transition-opacity ${earned ? '' : 'opacity-30 grayscale'}`}>{a.emoji}</span>
+                <span className={`mt-1.5 text-center text-[10px] font-semibold leading-tight ${earned ? 'text-ink' : 'text-muted'}`}>
                   {a.label}
                 </span>
-                {!a.earned && (
+                {a.max > 0 && (
+                  <span className={`mt-1 h-1 w-9 overflow-hidden rounded-full ${earned ? 'bg-green/20' : 'bg-ink/[0.06]'}`}>
+                    <span
+                      className={`block h-full rounded-full ${earned ? 'bg-green' : 'bg-muted/40'}`}
+                      style={{ width: `${Math.min(100, Math.round((value / a.max) * 100))}%` }}
+                    />
+                  </span>
+                )}
+                {!earned && (
                   <span className="absolute right-1.5 top-1.5 text-faint">
                     <Lock size={10} />
                   </span>
                 )}
-              </div>
+              </button>
             ))}
           </div>
+          {list.length > VISIBLE && (
+            <button
+              onClick={() => setShowAll((v) => !v)}
+              className="mt-2.5 flex w-full items-center justify-center gap-1 rounded-xl border border-line bg-surface py-2.5 text-[12px] font-semibold text-muted transition-colors hover:text-ink"
+            >
+              {showAll ? 'Show less' : `Show ${list.length - VISIBLE} more achievements`}
+              <ChevronDown size={13} className={`transition-transform ${showAll ? 'rotate-180' : ''}`} />
+            </button>
+          )}
         </div>
 
         {/* my reports */}
@@ -191,6 +235,16 @@ export default function Profile() {
           <LogOut size={16} /> Sign out
         </button>
       </div>
+
+      {/* achievement detail popup */}
+      {openAchievement && (
+        <AchievementModal
+          achievement={openAchievement}
+          value={list.find((l) => l.a.id === openAchievement.id)?.value ?? 0}
+          earned={list.find((l) => l.a.id === openAchievement.id)?.earned ?? false}
+          onClose={() => setOpenAchievement(null)}
+        />
+      )}
     </div>
   )
 }

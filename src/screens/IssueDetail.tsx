@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, BadgeCheck, BellPlus, Clock, MapPin, Share2, ThumbsUp, Trash2 } from 'lucide-react'
-import { BeforeAfterSlider } from '../components/BeforeAfterSlider'
+import { ArrowLeft, BadgeCheck, BellPlus, Clock, Flag, Link2, MapPin, Share2, ThumbsUp, Trash2 } from 'lucide-react'
 import { BudgetBar } from '../components/BudgetBar'
 import { CivicMap } from '../components/CivicMap'
 import { CoverImage } from '../components/CoverImage'
+import { PhotoCarousel } from '../components/PhotoCarousel'
 import { ReactionBar } from '../components/ReactionBar'
+import { ReportDialog } from '../components/ReportDialog'
 import { CategoryChip, StatusChip } from '../components/StatusChip'
 import { compact, formatINR, relativeTime, shortDate, slaInfo } from '../lib/format'
 import { CATEGORY_META } from '../lib/constants'
@@ -26,12 +27,16 @@ export default function IssueDetail() {
     addComment,
     deleteComment,
     deleteIssue,
+    reportContent,
     profile,
     loggedIn,
     ensureIssue,
   } = useApp()
   const [comment, setComment] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null) // 'issue' | comment id
+  const [reportOpen, setReportOpen] = useState(false)
+  const [shareMsg, setShareMsg] = useState<string | null>(null)
+  const [photoTab, setPhotoTab] = useState<'before' | 'after'>('before')
 
   const issue = issues.find((i) => i.id === id)
 
@@ -62,6 +67,7 @@ export default function IssueDetail() {
   const isCompleted = issue.status === 'completed'
   const sla = slaInfo(issue)
   const isMine = (uid?: string | null) => !!profile && !!uid && uid === profile.user_id
+  const beforePhotos = issue.photos?.length ? issue.photos : [issue.cover]
 
   const postComment = () => {
     const t = comment.trim()
@@ -96,14 +102,36 @@ export default function IssueDetail() {
     if (err) console.warn('delete comment failed:', err)
   }
 
+  const share = async () => {
+    setShareMsg(null)
+    const url = window.location.origin + `/issue/${issue.id}`
+    const text = `${issue.title} — report on CivicTrack`
+    // Native share sheet where available, copy-link fallback everywhere.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: text, url })
+        return
+      } catch {
+        /* user cancelled — fall through to copy */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      setShareMsg('Link copied to clipboard 🔗')
+      window.setTimeout(() => setShareMsg(null), 2500)
+    } catch {
+      setShareMsg(url)
+    }
+  }
+
   const canDeletePost = isMine(issue.user_id)
 
   return (
     <div className="min-h-dvh bg-bg">
       {/* hero */}
       <div className="relative">
-        <CoverImage cover={issue.cover} className="h-72 w-full">
-          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between p-4">
+        <PhotoCarousel photos={beforePhotos} className="relative h-72 w-full">
+          <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-4">
             <button
               onClick={() => navigate(-1)}
               className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition-transform active:scale-90"
@@ -131,6 +159,15 @@ export default function IssueDetail() {
                   </button>
                 ))}
               <button
+                onClick={() => setReportOpen(true)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition-transform active:scale-90"
+                aria-label="Report"
+                title="Report this post"
+              >
+                <Flag size={16} />
+              </button>
+              <button
+                onClick={() => void share()}
                 className="flex h-10 w-10 items-center justify-center rounded-full bg-black/50 text-white backdrop-blur-md transition-transform active:scale-90"
                 aria-label="Share"
               >
@@ -138,12 +175,20 @@ export default function IssueDetail() {
               </button>
             </div>
           </div>
-          <div className="absolute bottom-4 left-4 z-10 flex gap-2">
+          <div className="absolute bottom-4 left-4 z-20 flex gap-2">
             <CategoryChip label={cat.label} emoji={cat.emoji} />
             <StatusChip status={issue.status} />
           </div>
-        </CoverImage>
+        </PhotoCarousel>
       </div>
+
+      {shareMsg && (
+        <div className="fixed inset-x-0 top-3 z-[70] flex justify-center px-4">
+          <span className="flex max-w-sm items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-[11.5px] font-semibold text-bg shadow-float">
+            <Link2 size={12} /> {shareMsg}
+          </span>
+        </div>
+      )}
 
       {/* title + reporter */}
       <div className="px-4 pt-4">
@@ -192,7 +237,7 @@ export default function IssueDetail() {
         </div>
       </div>
 
-      {/* before/after proof */}
+      {/* before/after proof — clean tabs replace the drag slider */}
       <section className="mt-7 px-4">
         <div className="flex items-center justify-between">
           <h2 className="text-[15px] font-bold">Before → After</h2>
@@ -204,12 +249,40 @@ export default function IssueDetail() {
             </span>
           )}
         </div>
+
         <div className="mt-3">
-          {isCompleted && issue.afterCover ? (
-            <BeforeAfterSlider before={issue.cover} after={issue.afterCover} />
+          {issue.afterCover ? (
+            <>
+              {/* toggle: Before shows citizen photos, After shows completion proof */}
+              <div className="mb-2 flex gap-1 rounded-xl bg-surface p-1">
+                {(['before', 'after'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setPhotoTab(t)}
+                    className={`flex-1 rounded-lg py-1.5 text-[12px] font-bold capitalize transition-all ${
+                      photoTab === t ? 'bg-ink text-bg' : 'text-muted hover:text-ink'
+                    }`}
+                  >
+                    {t}
+                    {t === 'after' && <span className="ml-1 text-[10px] font-semibold text-green">✓</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-line">
+                {photoTab === 'before' ? (
+                  <PhotoCarousel photos={beforePhotos} className="relative h-56 w-full" />
+                ) : (
+                  <CoverImage cover={issue.afterCover} className="relative h-56 w-full">
+                    <span className="absolute bottom-2.5 left-2.5 z-10 rounded-full bg-green/90 px-2.5 py-1 text-[10px] font-bold text-bg backdrop-blur-md">
+                      ✓ Completed
+                    </span>
+                  </CoverImage>
+                )}
+              </div>
+            </>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-line">
-              <CoverImage cover={issue.cover} className="relative h-56 w-full">
+              <PhotoCarousel photos={beforePhotos} className="relative h-56 w-full">
                 <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-black/45 p-5 text-center backdrop-blur-[2px]">
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-2xl">
                     {isCompleted ? '📸' : '🕒'}
@@ -223,7 +296,7 @@ export default function IssueDetail() {
                       : 'The organization will post the after photo here once the work is completed.'}
                   </p>
                 </div>
-              </CoverImage>
+              </PhotoCarousel>
             </div>
           )}
         </div>
@@ -451,6 +524,14 @@ export default function IssueDetail() {
           </button>
         </div>
       </div>
+
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="issue"
+        targetId={issue.id}
+        onReport={reportContent}
+      />
     </div>
   )
 }

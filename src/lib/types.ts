@@ -45,8 +45,12 @@ export interface Issue {
   status: Status
   /** The photo the reporting citizen uploaded (the "before" state). */
   cover: CoverSpec
+  /** All citizen photos (before state) — cover is photos[0]. Phase 8 multi-photo. */
+  photos?: CoverSpec[]
   /** Org-posted completion proof; only set once the issue is completed. */
   afterCover?: CoverSpec
+  /** Hidden by moderation (5+ reports or the reporter was suspended). */
+  hidden?: boolean
   reporter: { name: string; color: string; verified: boolean }
   /** Legacy relative label; prefer deriving from createdAt. */
   timePosted: string
@@ -92,6 +96,12 @@ export interface Profile {
   created_at?: string
   /** Notification/appearance preferences — persisted per user. */
   settings?: ProfileSettings
+  /** Soft-ban flag — blocks sign-in and hides content (reversible by admin). */
+  suspended?: boolean
+  suspended_at?: string | null
+  suspended_reason?: string | null
+  /** Weekly in-app digest opt-in (default true). */
+  digest?: boolean
 }
 
 /** Organization row — real email + password, approved by an admin. */
@@ -104,6 +114,8 @@ export interface Organization {
   role: 'org' | 'admin'
   status: 'pending' | 'approved' | 'rejected'
   created_at: string
+  /** Deactivated orgs can't sign in but keep their history (reversible). */
+  inactive?: boolean
 }
 
 /** Personal notification, stored per user in the DB. */
@@ -129,6 +141,8 @@ export interface DbComment {
   text: string
   time: string
   created_at?: string
+  /** Hidden by moderation (5+ reports or the author was suspended). */
+  hidden?: boolean
 }
 
 export interface Area {
@@ -150,4 +164,29 @@ export interface AdminUser {
   comments_count: number
   /** Every username this person has ever used, latest first. Admin-only. */
   username_history?: { username: string; changed_at: string }[]
+  /** Soft-ban flag — the account can't sign in and its content is hidden. */
+  suspended?: boolean
+}
+
+/** Moderation queue row (admin-only, via admin_list_queue). */
+export interface ModerationItem {
+  id: string
+  target_type: 'issue' | 'comment'
+  target_id: string
+  reports_count: number
+  status: 'pending' | 'hidden' | 'resolved'
+  hidden_by_auto: boolean
+  target_title: string | null
+  reasons: string[] | null
+}
+
+/** Audit-log entry (admin-only, via admin_list_audit). */
+export interface AuditEntry {
+  actor_email: string | null
+  action: string
+  target_type: string
+  target_id: string | null
+  target_summary: string | null
+  details: Record<string, unknown> | null
+  created_at: string
 }

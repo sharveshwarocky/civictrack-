@@ -2,11 +2,10 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight, BadgeCheck, TrendingUp } from 'lucide-react'
 import { budgetShort } from '../lib/format'
-import { CATEGORY_META } from '../lib/constants'
 import { useApp } from '../lib/store'
 
 export function RightRail() {
-  const { issues } = useApp()
+  const { issues, trending } = useApp()
 
   const open = issues.filter((i) => i.status !== 'completed').length
   const resolved = issues.filter((i) => i.status === 'completed').length
@@ -20,19 +19,14 @@ export function RightRail() {
     { label: 'Areas', value: String(areaCount), color: 'text-blue' },
   ]
 
-  const trending = useMemo(() => {
-    const map = new Map<string, { label: string; emoji: string; count: number }>()
-    for (const i of issues) {
-      const meta = CATEGORY_META[i.category]
-      const cur = map.get(i.category) ?? { label: meta.label, emoji: meta.emoji, count: 0 }
-      cur.count += 1
-      map.set(i.category, cur)
-    }
-    return [...map.values()]
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .map((t, i) => ({ rank: i + 1, label: t.label, emoji: t.emoji, count: `${t.count} report${t.count === 1 ? '' : 's'}` }))
-  }, [issues])
+  // Trending = hot issues by engagement (server-computed).
+  const trendingList = trending.slice(0, 5).map((i, idx) => ({
+    rank: idx + 1,
+    id: i.id,
+    title: i.title,
+    emoji: i.cover.type === 'image' ? '📸' : '🔥',
+    score: i.upvotes + i.comments,
+  }))
 
   const updates = useMemo(
     () => issues.filter((i) => i.official).slice(0, 3),
@@ -70,17 +64,22 @@ export function RightRail() {
           <ArrowUpRight size={11} className="ml-auto text-faint" />
         </Link>
         <div className="mt-2.5 space-y-0.5">
-          {trending.map((t) => (
+          {trendingList.length === 0 && (
+            <p className="rounded-lg border border-line bg-ink/[0.015] p-2.5 text-[11px] leading-relaxed text-muted">
+              Nothing hot yet — reports that gain support appear here.
+            </p>
+          )}
+          {trendingList.map((t) => (
             <Link
               key={t.rank}
-              to="/app/search"
+              to={`/issue/${t.id}`}
               className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors nav-hover"
             >
               <span className="w-3.5 text-[11px] font-bold text-faint">{t.rank}</span>
               <span className="text-[12px]">{t.emoji}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[12px] font-medium">{t.label}</span>
-                <span className="block text-[9px] text-faint">{t.count}</span>
+                <span className="block truncate text-[12px] font-medium">{t.title}</span>
+                <span className="block text-[9px] text-faint">🔥 {t.score} engagement</span>
               </span>
             </Link>
           ))}

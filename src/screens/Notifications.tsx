@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCheck } from 'lucide-react'
+import { CalendarDays, CheckCheck } from 'lucide-react'
 import { ScreenHeader } from '../components/ScreenHeader'
 import { NOTIF_TYPE_BG } from '../lib/constants'
 import { useApp } from '../lib/store'
@@ -28,12 +28,14 @@ export default function Notifications() {
     )
     const today: AppNotification[] = []
     const earlier: AppNotification[] = []
+    const digest: AppNotification[] = []
     const day = 24 * 60 * 60000
     for (const n of sorted) {
-      if (Date.now() - new Date(n.created_at).getTime() < day) today.push(n)
+      if (n.title === 'Your weekly civic digest') digest.push(n)
+      else if (Date.now() - new Date(n.created_at).getTime() < day) today.push(n)
       else earlier.push(n)
     }
-    return { today, earlier }
+    return { today, earlier, digest: digest[0] ?? null, digestCount: digest.length }
   }, [notifications])
 
   const open = (n: AppNotification) => {
@@ -95,6 +97,35 @@ export default function Notifications() {
         </div>
       ) : (
         <>
+          {/* weekly digest card — the Monday summary lives here, not in email */}
+          {grouped.digest && (
+            <div className="mx-4 mt-4 overflow-hidden rounded-2xl border border-green/25 bg-gradient-to-br from-green/10 to-transparent">
+              <button
+                onClick={() => markRead(grouped.digest!.id)}
+                className="flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-green/5"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-green/15 text-green">
+                  <CalendarDays size={20} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2 text-[13.5px] font-bold">
+                    <span className="truncate">{grouped.digest.title}</span>
+                    {!grouped.digest.read && <span className="h-2 w-2 shrink-0 rounded-full bg-green" />}
+                  </span>
+                  <span className="mt-0.5 block text-[12px] leading-relaxed text-muted">{grouped.digest.body}</span>
+                  <span className="mt-1 block text-[10px] font-medium uppercase tracking-wide text-muted">
+                    {timeLabel(grouped.digest.created_at)} · tap to read
+                  </span>
+                </span>
+              </button>
+              {grouped.digestCount > 1 && (
+                <p className="border-t border-green/10 px-4 py-2 text-[10px] text-muted">
+                  {grouped.digestCount - 1} older digest{grouped.digestCount > 2 ? 's' : ''} in Earlier
+                </p>
+              )}
+            </div>
+          )}
+
           {grouped.today.length > 0 && (
             <>
               <p className="px-4 pb-1 pt-3 text-[11px] font-bold uppercase tracking-widest text-muted">Today</p>

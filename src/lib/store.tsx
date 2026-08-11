@@ -16,9 +16,11 @@ import { colorForUserId } from './username'
 import type {
   AdminUser,
   AppNotification,
+  AuditEntry,
   CoverSpec,
   DbComment,
   Issue,
+  ModerationItem,
   NotifType,
   Organization,
   Profile,
@@ -34,6 +36,8 @@ export interface Settings {
   notifPush: boolean
   notifEmail: boolean
   notifBudget: boolean
+  /** Weekly in-app digest (default on). */
+  digest: boolean
 }
 
 export interface AuthUser {
@@ -49,6 +53,8 @@ export interface NewIssueInput {
   lat: number
   lng: number
   cover: CoverSpec
+  /** All citizen photos (before state); cover is the primary/thumbnail. */
+  photos?: CoverSpec[]
 }
 
 export interface OfficialUpdateInput {
@@ -107,6 +113,26 @@ interface AppState {
   adminUsersError: string | null
   loadAdminUsers: (search?: string) => Promise<void>
   removeUser: (userId: string) => Promise<string | null>
+  // Phase 8: org removal, suspension, moderation queue, audit log
+  removeOrg: (orgId: string, mode: 'full' | 'wipe' | 'deactivate') => Promise<string | null>
+  suspendUser: (userId: string, reason?: string) => Promise<string | null>
+  restoreUser: (userId: string) => Promise<string | null>
+  modQueue: ModerationItem[]
+  modQueueError: string | null
+  loadModQueue: () => Promise<void>
+  resolveModeration: (queueId: string, decision: 'restore' | 'delete') => Promise<string | null>
+  auditLog: AuditEntry[]
+  auditLogError: string | null
+  loadAuditLog: () => Promise<void>
+  // citizen: report content + username availability + trending
+  reportContent: (targetType: 'issue' | 'comment', targetId: string, reason: string) => Promise<string | null>
+  checkUsername: (name: string) => Promise<boolean | null>
+  trending: Issue[]
+  loadTrending: () => Promise<void>
+  hasMore: boolean
+  loadMore: () => Promise<void>
+  suspended: boolean
+  suspendedReason: string | null
   // notifications
   notifications: AppNotification[]
   unreadCount: number
@@ -147,6 +173,7 @@ const DEFAULT_SETTINGS: Settings = {
   notifPush: true,
   notifEmail: true,
   notifBudget: true,
+  digest: true,
 }
 
 function loadSettings(): Settings {
@@ -175,6 +202,8 @@ function toIssue(raw: Record<string, unknown>): Issue {
     cover: r.cover && typeof r.cover === 'object'
       ? (r.cover as CoverSpec)
       : { type: 'gradient', from: '#2C4A6B', to: '#0E1621' },
+    photos: Array.isArray(r.photos) ? (r.photos as CoverSpec[]) : undefined,
+    hidden: r.hidden === true,
     afterCover: r.aftercover && typeof r.aftercover === 'object' ? (r.aftercover as CoverSpec) : undefined,
     reporter,
     timePosted: typeof r.timeposted === 'string' ? r.timeposted : 'recently',
@@ -265,6 +294,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   })
   const [pendingOrgs, setPendingOrgs] = useState<Organization[]>([])
+  const [suspended, setSuspended] = useState(false)
+  const [suspendedReason, setSuspendedReason] = useState<string | null>(null)
+  const [modQueue, setModQueue] = useState<ModerationItem[]>([])
+  const [modQueueError, setModQueueError] = useState<string | null>(null)
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([])
+  const [auditLogError, setAuditLogError] = useState<string | null>(null)
+  const [trendingIds, setTrendingIds] = useState<string[]>([])
+  const [hasMore, setHasMore] = useState(true)
+  const pageRef = useRef(0)
+  const loadingMoreRef = useRef(false)
   const [settings, setSettings] = useState<Settings>(() => {
     const s = loadSettings()
     const mq = typeof window !== 'undefined' ? window.matchMedia('(prefers-color-scheme: light)') : null
@@ -330,9 +369,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (data) {
         const p = data as Profile
         setProfile(p)
+        setSuspended(p.suspended === true)
+        setSuspendedReason(p.suspended_reason ?? null)
         setNeedsOnboarding(false)
         setAreaState((prev) => prev ?? p.home_area)
-        if (p.settings) setSettings((prev) => ({ ...prev, ...p.settings }))
+        if (p.settings) setSettings((prev) => ({ ...prev, ...p.settings, digest: p.digest !== false }))
+        else setSettings((prev) => ({ ...prev, digest: p.digest !== false }))
       } else {
         setProfile(null)
         setNeedsOnboarding(true)
@@ -445,33 +487,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // ---- issues: load from DB (start empty after purge) ----
-  useEffect(() => {
+  // ---- issues: paged feed (20/page, newest first). Hidden (moderated) rows are excluded. ----
+  const PAGE_SIZE = 20
+  const loadIssuesPage = useCallback(async (pg: number, append: boolean) => {
     if (!supabase) return
-    let cancelled = false
-    void (async () => {
-      const { data, error } = await supabase
-        .from('issues')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100)
-      if (cancelled || error || !Array.isArray(data)) return
-      setIssues(data.map((row) => toIssue(row as Record<string, unknown>)))
-    })()
-    return () => {
-      cancelled = true
-    }
+    const from = pg * PAGE_SIZE
+    const { data, error } = await supabase
+      .from('issues')
+      .select('*')
+      .eq('hidden', false)
+      .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
+    if (error || !Array.isArray(data)) return
+    const rows = data.map((row) => toIssue(row as Record<string, unknown>))
+    setIssues((prev) => {
+      const merged = append ? [...prev] : []
+      for (const r of rows) if (!merged.some((i) => i.id === r.id)) merged.push(r)
+      return merged
+    })
+    setHasMore(rows.length === PAGE_SIZE)
   }, [])
 
-  // ---- comments: initial load ----
+  useEffect(() => {
+    pageRef.current = 0
+    loadingMoreRef.current = false
+    void loadIssuesPage(0, false)
+    void loadTrending()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const loadMore = useCallback(async () => {
+    if (!supabase || loadingMoreRef.current || !hasMore) return
+    loadingMoreRef.current = true
+    const next = pageRef.current + 1
+    await loadIssuesPage(next, true)
+    pageRef.current = next
+    loadingMoreRef.current = false
+  }, [hasMore, loadIssuesPage])
+
+  // ---- load a single issue on demand (e.g. from a notification deep-link) ----
+  const ensureIssue = useCallback(async (id: string) => {
+    if (!supabase) return
+    if (issuesRef.current.some((i) => i.id === id)) return
+    const { data } = await supabase.from('issues').select('*').eq('id', id).maybeSingle()
+    if (!data) return
+    const issue = toIssue(data as Record<string, unknown>)
+    setIssues((prev) => (prev.some((i) => i.id === issue.id) ? prev : [issue, ...prev]))
+  }, [])
+
+  // ---- trending: hot issues by engagement in the last 48h (server-computed) ----
+  const loadTrending = useCallback(async () => {
+    if (!supabase) return
+    const { data, error } = await supabase.rpc('trending_issues', { p_limit: 8 })
+    if (error || !Array.isArray(data)) return
+    setTrendingIds(data.map((r) => String(r.id)))
+    // Make sure trending issues are available locally even if they fell outside the loaded pages.
+    for (const r of data as { id: string }[]) void ensureIssue(String(r.id))
+  }, [ensureIssue])
+
+  // ---- comments: initial load (hidden/moderated rows are excluded) ----
   useEffect(() => {
     if (!supabase) return
     let cancelled = false
     void (async () => {
-      const { data, error } = await supabase.from('comments').select('*')
+      const { data, error } = await supabase.from('comments').select('*').eq('hidden', false)
       if (cancelled || error || !Array.isArray(data)) return
       const grouped: Record<string, DbComment[]> = {}
       for (const c of data as DbComment[]) {
+        if (c.hidden) continue
         ;(grouped[c.issue_id] ??= []).push(c)
       }
       setComments(grouped)
@@ -490,6 +573,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'issues' }, (payload) => {
         const row = payload.new as Record<string, unknown>
         if (!row?.id || !row?.title) return
+        if (row.hidden === true) return
         const issue = toIssue(row)
         setIssues((prev) => (prev.some((i) => i.id === issue.id) ? prev : [issue, ...prev]))
       })
@@ -505,10 +589,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comments' }, (payload) => {
         const row = payload.new as unknown as DbComment
         if (!row?.issue_id || !row?.text) return
+        if (row.hidden) return
         setComments((prev) => {
           const list = prev[row.issue_id] ?? []
           if (list.some((c) => c.id === row.id)) return prev
           return { ...prev, [row.issue_id]: [...list, row] }
+        })
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'comments' }, (payload) => {
+        // Moderation flips hidden → remove it from view immediately.
+        const row = payload.new as unknown as DbComment
+        const id = row?.id
+        if (!id) return
+        setComments((prev) => {
+          const hit = Object.keys(prev).find((iid) => prev[iid].some((c) => c.id === id))
+          if (!hit) return prev
+          const list = row.hidden ? prev[hit].filter((c) => c.id !== id) : prev[hit].map((c) => (c.id === id ? row : c))
+          return { ...prev, [hit]: list }
         })
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comments' }, (payload) => {
@@ -549,7 +646,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Persist to the profile so prefs survive across devices and gate server-side fan-out.
       const uid = userIdRef.current
       if (supabase && uid) {
-        void supabase.from('profiles').update({ settings: next }).eq('user_id', uid)
+        // digest is a dedicated column; the rest live in the settings jsonb blob.
+        if (key === 'digest') {
+          void supabase.from('profiles').update({ digest: value === true }).eq('user_id', uid)
+        } else {
+          void supabase.from('profiles').update({ settings: next }).eq('user_id', uid)
+        }
       }
       return next
     })
@@ -563,6 +665,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setLoggedIn(false)
     setProfile(null)
+    setSuspended(false)
+    setSuspendedReason(null)
     setNeedsOnboarding(false)
     setFollowing({})
     setUpvoted({})
@@ -662,16 +766,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [],
   )
-
-  // ---- load a single issue on demand (e.g. from a notification deep-link) ----
-  const ensureIssue = useCallback(async (id: string) => {
-    if (!supabase) return
-    if (issuesRef.current.some((i) => i.id === id)) return
-    const { data } = await supabase.from('issues').select('*').eq('id', id).maybeSingle()
-    if (!data) return
-    const issue = toIssue(data as Record<string, unknown>)
-    setIssues((prev) => (prev.some((i) => i.id === issue.id) ? prev : [issue, ...prev]))
-  }, [])
 
   // ---- upvote ----
   const toggleUpvote = useCallback((id: string) => {
@@ -791,12 +885,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // ---- report an issue (photo upload + user_id) ----
   const addIssue = useCallback(async (input: NewIssueInput): Promise<string | null> => {
     const username = profileRef.current?.username ?? 'Citizen'
-    let cover = input.cover
-    if (cover.type === 'image' && cover.src && cover.src.startsWith('data:')) {
-      const url = await uploadPhoto(cover.src)
-      if (!url) return 'Photo upload failed — try a smaller image or check your connection.'
-      cover = { type: 'image', src: url }
+    // Upload every citizen photo (up to 10); the first becomes the cover.
+    const wanted = input.photos?.length
+      ? input.photos
+      : input.cover.type === 'image'
+        ? [input.cover]
+        : []
+    const uploaded: CoverSpec[] = []
+    for (const p of wanted) {
+      if (p.type === 'image' && p.src && p.src.startsWith('data:')) {
+        const url = await uploadPhoto(p.src)
+        if (!url) return 'Photo upload failed — try a smaller image or check your connection.'
+        uploaded.push({ type: 'image', src: url })
+      } else {
+        uploaded.push(p)
+      }
     }
+    const cover = uploaded[0] ?? input.cover
     const issue: Issue = {
       id: 'issue-' + Date.now(),
       title: input.title,
@@ -805,6 +910,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       category: input.category,
       status: 'reported',
       cover,
+      photos: uploaded.length ? uploaded : undefined,
       reporter: { name: username, color: colorForUserId(userIdRef.current ?? 'demo'), verified: false },
       timePosted: 'Just now',
       createdAt: new Date().toISOString(),
@@ -885,6 +991,114 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Drop their content from the local feed too.
     setIssues((prev) => prev.filter((i) => i.user_id !== userId))
     return null
+  }, [])
+
+  const loadPendingOrgs = useCallback(async () => {
+    if (!supabase) return
+    const { data } = await supabase
+      .from('organizations')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (Array.isArray(data)) setPendingOrgs(data as Organization[])
+  }, [])
+
+  // ---- admin: remove org / suspend / restore ----
+  const removeOrg = useCallback(
+    async (orgId: string, mode: 'full' | 'wipe' | 'deactivate'): Promise<string | null> => {
+      if (!supabase) return 'Admin portal requires Supabase to be configured'
+      const { data, error } = await supabase.rpc('admin_remove_org', { p_org_id: orgId, p_mode: mode })
+      if (error) return friendlyDbError(error.message)
+      if (typeof data === 'string' && data) return data
+      if (mode === 'deactivate' || mode === 'wipe') {
+        setPendingOrgs((prev) => prev.map((o) => (o.id === orgId ? { ...o, status: 'rejected', inactive: true } : o)))
+      } else {
+        setPendingOrgs((prev) => prev.filter((o) => o.id !== orgId))
+      }
+      void loadPendingOrgs()
+      return null
+    },
+    [loadPendingOrgs],
+  )
+
+  const suspendUser = useCallback(async (userId: string, reason?: string): Promise<string | null> => {
+    if (!supabase) return 'Admin portal requires Supabase to be configured'
+    const { data, error } = await supabase.rpc('admin_suspend_user', { p_user_id: userId, p_reason: reason ?? '' })
+    if (error) return friendlyDbError(error.message)
+    if (typeof data === 'string' && data) return data
+    setAdminUsers((prev) => prev.map((u) => (u.user_id === userId ? { ...u, suspended: true } : u)))
+    // Their content disappears from the public feed immediately.
+    setIssues((prev) => prev.filter((i) => i.user_id !== userId))
+    return null
+  }, [])
+
+  const restoreUser = useCallback(async (userId: string): Promise<string | null> => {
+    if (!supabase) return 'Admin portal requires Supabase to be configured'
+    const { data, error } = await supabase.rpc('admin_restore_user', { p_user_id: userId })
+    if (error) return friendlyDbError(error.message)
+    if (typeof data === 'string' && data) return data
+    setAdminUsers((prev) => prev.map((u) => (u.user_id === userId ? { ...u, suspended: false } : u)))
+    return null
+  }, [])
+
+  // ---- admin: moderation queue + audit log ----
+  const loadModQueue = useCallback(async () => {
+    if (!supabase) return
+    const { data, error } = await supabase.rpc('admin_list_queue')
+    if (error) {
+      console.warn('admin_list_queue failed:', error.message)
+      setModQueueError(friendlyDbError(error.message))
+      setModQueue([])
+      return
+    }
+    setModQueueError(null)
+    if (Array.isArray(data)) setModQueue(data as ModerationItem[])
+  }, [])
+
+  const resolveModeration = useCallback(async (queueId: string, decision: 'restore' | 'delete'): Promise<string | null> => {
+    if (!supabase) return 'Admin portal requires Supabase to be configured'
+    const { data, error } = await supabase.rpc('resolve_report', { p_queue_id: queueId, p_decision: decision })
+    if (error) return friendlyDbError(error.message)
+    if (typeof data === 'string' && data) return data
+    setModQueue((prev) => prev.filter((q) => q.id !== queueId))
+    if (decision === 'delete') {
+      const item = modQueue.find((q) => q.id === queueId)
+      if (item?.target_type === 'issue') setIssues((prev) => prev.filter((i) => i.id !== item.target_id))
+    }
+    return null
+  }, [modQueue])
+
+  const loadAuditLog = useCallback(async () => {
+    if (!supabase) return
+    const { data, error } = await supabase.rpc('admin_list_audit', { p_limit: 100 })
+    if (error) {
+      console.warn('admin_list_audit failed:', error.message)
+      setAuditLogError(friendlyDbError(error.message))
+      setAuditLog([])
+      return
+    }
+    setAuditLogError(null)
+    if (Array.isArray(data)) setAuditLog(data as AuditEntry[])
+  }, [])
+
+  // ---- citizen: report content + username availability ----
+  const reportContent = useCallback(async (targetType: 'issue' | 'comment', targetId: string, reason: string) => {
+    if (!supabase) return 'Sign in to report content'
+    const { data, error } = await supabase.rpc('report_content', {
+      p_target_type: targetType,
+      p_target_id: targetId,
+      p_reason: reason,
+    })
+    if (error) return friendlyDbError(error.message)
+    if (typeof data === 'string' && data) return data
+    return null
+  }, [])
+
+  const checkUsername = useCallback(async (name: string): Promise<boolean | null> => {
+    if (!supabase) return null
+    if (name.trim().length < 3) return null
+    const { data, error } = await supabase.rpc('username_taken', { p_username: name.trim() })
+    if (error) return null
+    return data === true
   }, [])
 
   // ---- comments ----
@@ -1005,15 +1219,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (data.user?.user_metadata?.role === 'org') void client.auth.signOut()
       })
     }
-  }, [])
-
-  const loadPendingOrgs = useCallback(async () => {
-    if (!supabase) return
-    const { data } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (Array.isArray(data)) setPendingOrgs(data as Organization[])
   }, [])
 
   const approveOrg = useCallback(async (id: string, status: 'approved' | 'rejected') => {
@@ -1179,6 +1384,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       adminUsersError,
       loadAdminUsers,
       removeUser,
+      removeOrg,
+      suspendUser,
+      restoreUser,
+      modQueue,
+      modQueueError,
+      loadModQueue,
+      resolveModeration,
+      auditLog,
+      auditLogError,
+      loadAuditLog,
+      reportContent,
+      checkUsername,
+      trending: trendingIds.map((id) => issues.find((i) => i.id === id)).filter((i): i is Issue => !!i),
+      loadTrending,
+      hasMore,
+      loadMore,
+      suspended,
+      suspendedReason,
       notifications,
       unreadCount,
       markRead,
@@ -1199,6 +1422,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveProfile, sendEmailOtp, verifyEmailOtp, loginWithGoogle, authError, clearAuthError, sendPasswordReset, updatePassword,
       upvoted, toggleUpvote, following, toggleFollow, reactions, reactToOfficial, addIssue, ensureIssue,
       comments, addComment, deleteComment, deleteIssue, adminUsers, adminUsersError, loadAdminUsers, removeUser,
+      removeOrg, suspendUser, restoreUser, modQueue, modQueueError, loadModQueue, resolveModeration,
+      auditLog, auditLogError, loadAuditLog, reportContent, checkUsername,
+      trendingIds, issues, loadTrending, hasMore, loadMore, suspended, suspendedReason,
       notifications, unreadCount, markRead, markAllRead, org, loginOrg,
       registerOrg, logoutOrg, pendingOrgs, loadPendingOrgs, approveOrg, postOfficialUpdate,
       settings, setSetting,

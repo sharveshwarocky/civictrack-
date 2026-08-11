@@ -59,7 +59,14 @@ export default function DeptIssues() {
   if (!org) return null
   const deptInfo = getDeptById(org.department)
 
-  const deptIssues = deptInfo ? issues.filter((i) => deptInfo.categories.includes(i.category)) : issues
+  // Admin sees EVERY issue and can work on any of them; a regular org only
+  // sees issues in its own department's categories (department → category map).
+  const deptIssues =
+    org.role === 'admin'
+      ? issues
+      : deptInfo
+        ? issues.filter((i) => deptInfo.categories.includes(i.category))
+        : issues
   const filtered = deptIssues.filter((i) => {
     if (filter === 'open') return i.status !== 'completed'
     if (filter === 'overdue') return i.status === 'overdue'
@@ -152,7 +159,8 @@ export default function DeptIssues() {
         <div>
           <h1 className="text-[18px] font-bold tracking-tight">Issues &amp; work</h1>
           <p className="mt-0.5 text-[11px] text-muted">
-            {filtered.length} of {deptIssues.length} issues · post updates, budgets and completion proof
+            {filtered.length} of {deptIssues.length} issues
+            {org.role === 'admin' ? ' · admin — all departments visible' : ' · post updates, budgets and completion proof'}
           </p>
         </div>
         <div className="flex gap-1.5">

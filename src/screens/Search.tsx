@@ -11,29 +11,25 @@ import type { Category } from '../lib/types'
 const CATS: Category[] = ['Road', 'Water', 'Garbage', 'Electricity', 'Traffic', 'Drainage']
 
 export default function Search() {
-  const { issues } = useApp()
+  const { issues, trending } = useApp()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<Category | null>(null)
   const [recent, setRecent] = useState<string[]>([])
 
-  const trending = useMemo(() => {
-    const map = new Map<string, { label: string; emoji: string; count: number }>()
-    for (const i of issues) {
-      const meta = CATEGORY_META[i.category]
-      const cur = map.get(i.category) ?? { label: meta.label, emoji: meta.emoji, count: 0 }
-      cur.count += 1
-      map.set(i.category, cur)
-    }
-    return [...map.values()]
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .map((t, i) => ({ rank: i + 1, label: t.label, emoji: t.emoji, count: `${t.count} ${t.count === 1 ? 'report' : 'reports'}` }))
-  }, [issues])
+  // Trending = hot issues by engagement (48h upvotes + comments), server-computed.
+  const trendingList = trending.slice(0, 5).map((i, idx) => ({
+    rank: idx + 1,
+    id: i.id,
+    emoji: CATEGORY_META[i.category]?.emoji ?? '📍',
+    title: i.title,
+    score: i.upvotes + i.comments,
+  }))
 
   const results = useMemo(() => {
     const term = q.trim().toLowerCase()
     return issues.filter((i) => {
+      if (i.hidden) return false // moderated content never shows in search
       if (cat && i.category !== cat) return false
       if (!term) return true
       return (
@@ -105,17 +101,22 @@ export default function Search() {
         </div>
       </div>
 
-      {/* trending */}
+      {/* trending — hot issues by engagement */}
       {!searching && (
         <div className="mt-5 px-4">
           <div className="flex items-center gap-1.5 text-[13px] font-bold">
             <TrendingUp size={15} className="text-orange" /> Trending today
           </div>
           <div className="mt-2.5 overflow-hidden rounded-2xl border border-line bg-surface">
-            {trending.map((t) => (
+            {trendingList.length === 0 && (
+              <p className="px-4 py-5 text-center text-[12px] text-muted">
+                Nothing hot right now — new reports appear here as they gain support.
+              </p>
+            )}
+            {trendingList.map((t) => (
               <button
                 key={t.rank}
-                onClick={() => commit(t.label)}
+                onClick={() => navigate(`/issue/${t.id}`)}
                 className="flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left transition-colors last:border-0 hover:bg-ink/5"
               >
                 <span
@@ -124,8 +125,10 @@ export default function Search() {
                   {t.rank}
                 </span>
                 <span className="text-sm">{t.emoji}</span>
-                <span className="flex-1 text-sm font-semibold">{t.label}</span>
-                <span className="text-[11px] text-muted">{t.count}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold">{t.title}</span>
+                  <span className="block text-[10px] text-faint">🔥 {t.score} engagement points</span>
+                </span>
               </button>
             ))}
           </div>

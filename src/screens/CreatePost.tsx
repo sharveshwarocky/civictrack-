@@ -3,21 +3,23 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Camera, Check, ImagePlus, LocateFixed, X } from 'lucide-react'
 import { Marker } from 'react-leaflet'
 import { CivicMap, darkIcon } from '../components/CivicMap'
-import { CoverImage } from '../components/CoverImage'
+import { PhotoCarousel } from '../components/PhotoCarousel'
 import { CATEGORIES, CATEGORY_META } from '../lib/constants'
 import { AREAS, getArea } from '../lib/areas'
 import { fmtCoords, getCurrentCoords } from '../lib/geo'
 import { useApp } from '../lib/store'
 import type { Category, CoverSpec } from '../lib/types'
 
-const STEPS = ['Photo', 'Location', 'Category', 'Details']
+const STEPS = ['Photos', 'Location', 'Category', 'Details']
+const MAX_PHOTOS = 10
 
 export default function CreatePost() {
   const { area, profile, addIssue } = useApp()
   const navigate = useNavigate()
-  const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
   const [step, setStep] = useState(0)
-  const [photo, setPhoto] = useState<CoverSpec | null>(null)
+  const [photos, setPhotos] = useState<CoverSpec[]>([])
   const [pos, setPos] = useState<[number, number] | null>(null)
   const [detecting, setDetecting] = useState(false)
   const [category, setCategory] = useState<Category | null>(null)
@@ -27,17 +29,29 @@ export default function CreatePost() {
   const [error, setError] = useState('')
 
   const canNext =
-    (step === 0 && !!photo) ||
+    (step === 0 && photos.length > 0) ||
     (step === 1 && !!pos) ||
     (step === 2 && !!category) ||
     (step === 3 && title.trim().length > 0)
 
-  const pickFile = (f: File | undefined) => {
-    if (!f) return
-    const reader = new FileReader()
-    reader.onload = () => setPhoto({ type: 'image', src: String(reader.result) })
-    reader.readAsDataURL(f)
+  const addFiles = (files: FileList | null) => {
+    if (!files) return
+    const room = MAX_PHOTOS - photos.length
+    const list = Array.from(files).slice(0, room)
+    for (const f of list) {
+      const reader = new FileReader()
+      reader.onload = () =>
+        setPhotos((prev) => {
+          if (prev.length >= MAX_PHOTOS) return prev
+          return [...prev, { type: 'image', src: String(reader.result) }]
+        })
+      reader.readAsDataURL(f)
+    }
+    if (files.length > room) setError(`You can attach up to ${MAX_PHOTOS} photos.`)
+    else setError('')
   }
+
+  const removePhoto = (i: number) => setPhotos((prev) => prev.filter((_, idx) => idx !== i))
 
   const detect = async () => {
     if (detecting || pos) return
@@ -67,7 +81,8 @@ export default function CreatePost() {
       status: 'reported',
       lat: pos[0],
       lng: pos[1],
-      cover: photo ?? { type: 'gradient', from: '#2C4A6B', to: '#0E1621' },
+      cover: photos[0] ?? { type: 'gradient', from: '#2C4A6B', to: '#0E1621' },
+      photos,
     })
     setSubmitting(false)
     if (err) {
@@ -105,51 +120,90 @@ export default function CreatePost() {
       </div>
 
       <div className="mt-6">
-        {/* STEP 1 — photo */}
+        {/* STEP 1 — photos */}
         {step === 0 && (
           <div>
-            {photo ? (
-              <CoverImage cover={photo} className="relative h-80 w-full rounded-2xl">
-                <span className="absolute right-3 top-3 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-green backdrop-blur-md">
-                  ✓ Photo ready
+            {photos.length > 0 ? (
+              <PhotoCarousel photos={photos} className="relative h-80 w-full rounded-2xl">
+                <span className="absolute right-3 top-3 z-10 rounded-full bg-black/60 px-2.5 py-1 text-[10px] font-bold text-green backdrop-blur-md">
+                  ✓ {photos.length} photo{photos.length > 1 ? 's' : ''} ready
                 </span>
-              </CoverImage>
+              </PhotoCarousel>
             ) : (
               <button
-                onClick={() => fileRef.current?.click()}
+                onClick={() => galleryRef.current?.click()}
                 className="flex h-80 w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-line bg-surface text-muted transition-colors hover:border-green/40"
               >
                 <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-surface2">
                   <Camera size={28} />
                 </span>
-                <span className="text-sm font-semibold text-ink">Add a photo of the issue</span>
-                <span className="text-[12px]">This becomes the "before" photo for before → after proof</span>
+                <span className="text-sm font-semibold text-ink">Add photos of the issue</span>
+                <span className="px-6 text-center text-[12px]">
+                  Up to {MAX_PHOTOS} photos — these become the "before" proof for before → after
+                </span>
               </button>
             )}
+
+            {/* camera + gallery inputs — gallery has NO capture attr so it opens the picker */}
             <input
-              ref={fileRef}
+              ref={cameraRef}
               type="file"
               accept="image/*"
               capture="environment"
               className="hidden"
-              onChange={(e) => pickFile(e.target.files?.[0])}
+              onChange={(e) => {
+                addFiles(e.target.files)
+                e.target.value = ''
+              }}
             />
+            <input
+              ref={galleryRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addFiles(e.target.files)
+                e.target.value = ''
+              }}
+            />
+
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
-                onClick={() => fileRef.current?.click()}
-                className="flex items-center justify-center gap-2 rounded-2xl border border-line bg-surface py-3.5 text-sm font-semibold transition-colors active:scale-[0.98]"
+                onClick={() => cameraRef.current?.click()}
+                disabled={photos.length >= MAX_PHOTOS}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-line bg-surface py-3.5 text-sm font-semibold transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ImagePlus size={17} className="text-blue" /> {photo ? 'Change photo' : 'Camera / Gallery'}
+                <Camera size={17} className="text-blue" /> Camera
               </button>
-              {photo && (
-                <button
-                  onClick={() => setPhoto(null)}
-                  className="flex items-center justify-center gap-2 rounded-2xl border border-line bg-surface py-3.5 text-sm font-semibold text-muted transition-colors active:scale-[0.98]"
-                >
-                  <X size={17} /> Remove
-                </button>
-              )}
+              <button
+                onClick={() => galleryRef.current?.click()}
+                disabled={photos.length >= MAX_PHOTOS}
+                className="flex items-center justify-center gap-2 rounded-2xl border border-line bg-surface py-3.5 text-sm font-semibold transition-colors active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ImagePlus size={17} className="text-green" /> Gallery
+              </button>
             </div>
+
+            {/* thumbnail strip with per-photo remove */}
+            {photos.length > 1 && (
+              <div className="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1">
+                {photos.map((p, i) => (
+                  <div key={i} className="relative h-14 w-14 shrink-0">
+                    <img src={p.src} alt={`Photo ${i + 1}`} className="h-full w-full rounded-lg object-cover" />
+                    <button
+                      onClick={() => removePhoto(i)}
+                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red text-white shadow"
+                      aria-label={`Remove photo ${i + 1}`}
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {error && <p className="mt-3 text-center text-[11px] font-medium text-orange">{error}</p>}
             <p className="mt-3 text-center text-[11px] text-faint">
               Uploading as @{profile?.username ?? 'anonymous'} — your email is never shown
             </p>
@@ -251,6 +305,9 @@ export default function CreatePost() {
               )}
               <span className="rounded-full bg-surface px-3 py-1.5 text-[12px] font-semibold text-muted">
                 📍 {area ?? profile?.home_area ?? 'Anna Nagar'}
+              </span>
+              <span className="rounded-full bg-surface px-3 py-1.5 text-[12px] font-semibold text-muted">
+                📷 {photos.length} photo{photos.length > 1 ? 's' : ''}
               </span>
             </div>
             {error && <p className="mt-3 text-center text-[11px] font-medium text-red">{error}</p>}

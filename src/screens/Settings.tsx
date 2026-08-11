@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Bell,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
   Globe,
@@ -54,8 +55,9 @@ export default function Settings() {
 
   const notifs = [
     { key: 'notifPush' as const, label: 'Push notifications', sub: 'Support, replies & status changes', icon: Smartphone },
-    { key: 'notifEmail' as const, label: 'Email alerts', sub: 'Weekly digests & budget changes', icon: Mail },
+    { key: 'notifEmail' as const, label: 'Email alerts', sub: 'Budget changes & account activity', icon: Mail },
     { key: 'notifBudget' as const, label: 'Budget alerts', sub: 'Notify me when budgets are revised', icon: Bell },
+    { key: 'digest' as const, label: 'Weekly digest', sub: 'A Monday summary in your Notifications — new issues, updates & resolutions in your area', icon: CalendarDays },
   ]
 
   const signOut = () => {

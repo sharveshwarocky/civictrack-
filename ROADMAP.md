@@ -59,10 +59,42 @@
 - [x] UI: admin deletes any report in the gov Issues panel; Admin panel gets Citizens search + Comments moderation tabs
 - [x] Fix `admin_list_users` varchar(255)→text cast (42804) so the Citizens tab actually loads
 
-## Phase 7 — Identity history (admin-only) (in progress)
-- [ ] `username_history` table: every username a person has used, linked to their real Gmail — `upgrade-phase7.sql`
-- [ ] Trigger records username on signup + every profile rename automatically; backfill for existing profiles
-- [ ] RLS: table has NO policies — reachable only via SECURITY DEFINER admin RPCs (citizens never see it)
-- [ ] `admin_user_history` RPC (full dossier) + `admin_list_users` returns history summary
-- [ ] UI: Citizens tab shows rename count + expandable identity history (real email, all usernames, when changed)
-- [ ] Run `upgrade-phase7.sql` in the SQL editor, then verify live
+## Phase 7 — Identity history (admin-only) ✅
+- [x] `username_history` table: every username a person has used, linked to their real Gmail — `upgrade-phase7.sql`
+- [x] Trigger records username on signup + every profile rename automatically; backfill for existing profiles
+- [x] RLS: table has NO policies — reachable only via SECURITY DEFINER admin RPCs (citizens never see it)
+- [x] `admin_user_history` RPC (full dossier) + `admin_list_users` returns history summary
+- [x] UI: Citizens tab shows rename count + expandable identity history (real email, all usernames, when changed)
+- [x] Run `upgrade-phase7.sql` in the SQL editor, then verify live
+
+## Phase 8 — Full release ✅ (implemented, SQL not yet run)
+*The complete spec from full-release-spec.md — fixes + trust/scale features.*
+
+### Fixes
+- [x] **A1** Gov portal: admin sees ALL issues in Issues & work; regular orgs keep their department view — `DeptIssues.tsx`
+- [x] **A2** Admin can remove organizations with 3 depth options (deactivate / wipe / full remove) — `admin_remove_org` RPC
+- [x] **A4** World location chooser: 33k-city bundled dataset, search bar, current/nearby/recents quick access, GPS resolution — `LocationPicker.tsx`, `world-cities.json`, `world-coords.ts`
+- [x] **A5** Feed comment button opens a comment sheet with a close button — `CommentSheet.tsx` wired into `PostCard`
+- [x] **A6** Share works everywhere: native share sheet + copy-link fallback
+- [x] **A7** Up to 10 photos per report, swipable Insta-style carousel — `PhotoCarousel.tsx`, multi-photo CreatePost
+- [x] **A8** Gallery upload fixed — separate Camera / Gallery buttons (no `capture` hijack on gallery)
+- [x] **A9** 51 live-computed achievements, show-more toggle, tap → detail popup with progress — `achievements.ts`, `AchievementModal.tsx`
+- [x] **A10** Issue follow verified end-to-end (follows table persists across devices)
+- [x] **A11** Before/After tabs replace the drag slider (clean toggle per post)
+- [x] **A12** Images use contain + blurred backdrop (no stretching on desktop) — `CoverImage.tsx` fit mode
+- [x] **A13** Trending = hot issues by engagement (48h votes + comments, server-computed) — `trending_issues` RPC
+
+### Trust & scale features
+- [x] **B1** Admin audit log (`admin_audit` + `log_audit`) — every moderation action recorded, admin-only
+- [x] **B2** Soft-ban / suspension — `admin_suspend_user` / `admin_restore_user`, blocks sign-in, hides content, reversible
+- [x] **B3** Flag & report flow — `report_content` RPC, 5+ reports auto-hide → `resolve_report` admin decision
+- [x] **B4** Live username availability check in onboarding — `username_taken` RPC
+- [x] **B5** Infinite scroll feed — paged 20/page, `hasMore`/`loadMore`
+- [x] **B6** Weekly in-app digest — `weekly_digest_build` + pg_cron, shows as a card in Notifications, toggle in Settings
+- [x] **B7** Verified-resident badge logic (email + 3 reports or 30 days) feeding the Verified Resident achievement
+
+### SQL
+- [x] `supabase/upgrade-phase8.sql` — all tables, RPCs, RLS, realtime + grants. **Run in the SQL editor**, then verify live.
+
+### Validation
+- [x] tsc · vitest (52 tests) · production build all green
