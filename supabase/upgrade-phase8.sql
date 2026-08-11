@@ -564,7 +564,7 @@ begin
   for j in select jobid from cron.job where jobname = 'ct-weekly-digest' loop
     perform cron.unschedule(j.jobid);
   end loop;
-  perform cron.schedule('ct-weekly-digest', '0 7 * * 1', $$select weekly_digest_build()$$);
+  perform cron.schedule('ct-weekly-digest', '0 7 * * 1', $digest$select weekly_digest_build()$digest$);
 end $$;
 
 -- ============================================================
