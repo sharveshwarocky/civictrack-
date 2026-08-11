@@ -148,4 +148,6 @@ export interface AdminUser {
   created_at: string
   issues_count: number
   comments_count: number
+  /** Every username this person has ever used, latest first. Admin-only. */
+  username_history?: { username: string; changed_at: string }[]
 }

@@ -3,7 +3,10 @@ import {
   BadgeCheck,
   Building2,
   Check,
+  ChevronDown,
   Clock,
+  History,
+  Mail,
   MessageSquare,
   Search,
   ShieldCheck,
@@ -33,6 +36,7 @@ export default function Admin() {
   const [tab, setTab] = useState<Tab>('orgs')
   const [search, setSearch] = useState('')
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [openHistory, setOpenHistory] = useState<string | null>(null)
 
   useEffect(() => {
     void loadPendingOrgs()
@@ -213,45 +217,90 @@ export default function Admin() {
                 {search.trim() ? `No citizens match “${search.trim()}”.` : 'No citizen accounts yet — new sign-ups appear here.'}
               </p>
             )}
-            {adminUsers.map((u) => (
-              <div key={u.user_id} className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-bg/50 p-3">
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-                  style={{ background: 'linear-gradient(135deg, #2979FF, #2979FF77)' }}
-                >
-                  {(u.username ?? '?')[0].toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <p className="truncate text-[13px] font-bold">{u.username ?? 'Unnamed citizen'}</p>
-                    <span className="rounded-full bg-surface2 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-muted">
-                      {u.home_area ?? 'No area'}
+            {adminUsers.map((u) => {
+              const hist = u.username_history ?? []
+              const open = openHistory === u.user_id
+              return (
+                <div key={u.user_id} className="rounded-xl border border-line bg-bg/50">
+                  <div className="flex flex-wrap items-center gap-3 p-3">
+                    <span
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                      style={{ background: 'linear-gradient(135deg, #2979FF, #2979FF77)' }}
+                    >
+                      {(u.username ?? '?')[0].toUpperCase()}
                     </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-[13px] font-bold">{u.username ?? 'Unnamed citizen'}</p>
+                        <span className="rounded-full bg-surface2 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-muted">
+                          {u.home_area ?? 'No area'}
+                        </span>
+                        {hist.length > 1 && (
+                          <span className="rounded-full bg-orange/15 px-2 py-0.5 text-[9px] font-bold text-orange" title="Changed username before">
+                            ↻ {hist.length - 1} rename{hist.length > 2 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <p className="truncate text-[11px] text-muted">
+                        <span className="inline-flex items-center gap-1 align-middle">
+                          <Mail size={10} className="inline" /> {u.email ?? 'no email'}
+                        </span>
+                        {' '}· joined {timeAgo(u.created_at)}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-faint">
+                        📝 {u.issues_count} reports · 💬 {u.comments_count} comments
+                      </p>
+                    </div>
+                    {hist.length > 1 && (
+                      <button
+                        onClick={() => setOpenHistory(open ? null : u.user_id)}
+                        className="flex shrink-0 items-center gap-1 rounded-lg border border-line bg-surface2 px-2.5 py-1.5 text-[10px] font-semibold text-muted transition-colors hover:text-ink"
+                      >
+                        <History size={11} /> History <ChevronDown size={11} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+                      </button>
+                    )}
+                    {confirmDel === u.user_id ? (
+                      <button
+                        onClick={() => void removeCitizen(u.user_id)}
+                        className="flex shrink-0 items-center gap-1 rounded-xl bg-red px-3 py-2 text-[12px] font-bold text-white transition-transform active:scale-95"
+                      >
+                        <Trash2 size={14} /> Confirm remove?
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => armDelete(u.user_id)}
+                        className="flex shrink-0 items-center gap-1 rounded-xl border border-red/20 bg-red/5 px-3 py-2 text-[12px] font-bold text-red transition-colors hover:bg-red/10"
+                      >
+                        <UserX size={14} /> Remove
+                      </button>
+                    )}
                   </div>
-                  <p className="truncate text-[11px] text-muted">
-                    {u.email ?? 'no email'} · joined {timeAgo(u.created_at)}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-faint">
-                    📝 {u.issues_count} reports · 💬 {u.comments_count} comments
-                  </p>
+                  {open && (
+                    <div className="border-t border-line/60 px-4 py-3">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted">Identity history (admin only)</p>
+                      <div className="mt-2 space-y-1.5">
+                        {hist.map((h, i) => (
+                          <div key={h.username + h.changed_at} className="flex items-center gap-2 text-[11.5px]">
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${i === 0 ? 'bg-green/15 text-green' : 'bg-surface2 text-muted'}`}>
+                              {i + 1}
+                            </span>
+                            <span className={i === 0 ? 'font-bold text-ink' : 'text-muted'}>
+                              {h.username}
+                              {i === 0 && <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wide text-green">current</span>}
+                            </span>
+                            <span className="ml-auto text-[10px] text-faint">{timeAgo(h.changed_at)}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-2.5 text-[10px] leading-relaxed text-faint">
+                        This person's real account is <span className="font-semibold text-ink">{u.email ?? 'unknown'}</span>. Removing the account
+                        deletes this identity history too.
+                      </p>
+                    </div>
+                  )}
                 </div>
-                {confirmDel === u.user_id ? (
-                  <button
-                    onClick={() => void removeCitizen(u.user_id)}
-                    className="flex shrink-0 items-center gap-1 rounded-xl bg-red px-3 py-2 text-[12px] font-bold text-white transition-transform active:scale-95"
-                  >
-                    <Trash2 size={14} /> Confirm remove?
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => armDelete(u.user_id)}
-                    className="flex shrink-0 items-center gap-1 rounded-xl border border-red/20 bg-red/5 px-3 py-2 text-[12px] font-bold text-red transition-colors hover:bg-red/10"
-                  >
-                    <UserX size={14} /> Remove
-                  </button>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         </Card>
       )}

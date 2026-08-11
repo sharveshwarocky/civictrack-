@@ -51,10 +51,18 @@
 - [x] Bootstrap first admin account (dashboard user + `role: org` metadata + approved row)
 - [x] Confirm org work panel posts updates (with & without contractor)
 
-## Phase 6 — Content deletion & citizen moderation (in progress)
-- [ ] RLS delete policies: report owner **or** approved admin can delete issues & comments — `upgrade-phase6.sql`
-- [ ] `delete_issue` RPC removes the report + its comments atomically (comments have no FK to issues)
-- [ ] `admin_list_users` / `admin_delete_user` RPCs — admin can search citizens & remove accounts (+ all their content)
-- [ ] UI: citizen deletes own report & comments (IssueDetail, two-step confirm)
-- [ ] UI: admin deletes any report in the gov Issues panel; Admin panel gets Citizens search + Comments moderation tabs
-- [ ] Run `upgrade-phase6.sql` in the SQL editor, then verify all flows live
+## Phase 6 — Content deletion & citizen moderation ✅
+- [x] RLS delete policies: report owner **or** approved admin can delete issues & comments — `upgrade-phase6.sql`
+- [x] `delete_issue` RPC removes the report + its comments atomically (comments have no FK to issues)
+- [x] `admin_list_users` / `admin_delete_user` RPCs — admin can search citizens & remove accounts (+ all their content)
+- [x] UI: citizen deletes own report & comments (IssueDetail, two-step confirm)
+- [x] UI: admin deletes any report in the gov Issues panel; Admin panel gets Citizens search + Comments moderation tabs
+- [x] Fix `admin_list_users` varchar(255)→text cast (42804) so the Citizens tab actually loads
+
+## Phase 7 — Identity history (admin-only) (in progress)
+- [ ] `username_history` table: every username a person has used, linked to their real Gmail — `upgrade-phase7.sql`
+- [ ] Trigger records username on signup + every profile rename automatically; backfill for existing profiles
+- [ ] RLS: table has NO policies — reachable only via SECURITY DEFINER admin RPCs (citizens never see it)
+- [ ] `admin_user_history` RPC (full dossier) + `admin_list_users` returns history summary
+- [ ] UI: Citizens tab shows rename count + expandable identity history (real email, all usernames, when changed)
+- [ ] Run `upgrade-phase7.sql` in the SQL editor, then verify live
